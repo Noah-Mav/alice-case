@@ -214,7 +214,7 @@ def dowel_points(b, n=3):
     return pick, len(ok)
 
 
-DOWEL_YZ = [(-5, 6), (47, 7), (93, 30)]  # found by dowel_points() (slow: ~5 min); halves(search=True) re-runs it
+DOWEL_YZ = [(-5, 4), (93, 33), (47, 8)]  # (M7 v7: the 4 mm panel's rabbet moved the middle one up)  # found by dowel_points() (slow: ~5 min); halves(search=True) re-runs it
 
 
 def halves(search=False):
@@ -353,7 +353,7 @@ def coupons():
                for s in (-1, 1) for t in (0, in_)]
     zcut = min(floor_z(m, p[0], p[1]) for p in corners) - 2.0
     log("  snap coupon: floor-patch cut at z", round(zcut, 2))
-    assert zcut > P["panel_t"] + 0.5, zcut
+    assert zcut > 0.5, zcut  # (M7: the body is solid to the desk under the front snaps)
     save("c2_wall_snap_body", op(cp(body("Body")), obox(cw, aw, 32, out_ + in_, zcut, 80), "Intersection"),
          f"left front snap: wall, {P['snap_gap']} gap, post, floor patch; flat cut face down")
     pcbc = put("FlatPcbL", [], hidden=True)
@@ -369,7 +369,8 @@ def coupons():
          "USB notch, UDB bay, lip pocket; bottom (rabbet roof plane) down; notch roof bridges 12 mm")
     save("c4_usb_panel_band", op(cp(body("Panel")), box(*nb, -10, 20), "Intersection"),
          "panel band under the notch with its lip and UDB mounts; outer face down")
-    eb = (-12.0, 16.0, 78.0, 100.0)
+    xe = g["lip_ends"][0]  # M7: the band end is one 21 mm diagonal from the panel's back-left corner to its top
+    eb = (xe - 12.0, xe + 28.0, 78.0, 100.0)
     save("c4_band_end_body", op(cp(body("Body")), box(*eb, -1, 17.0), "Intersection"),
          "back-left corner where the band ends on its diagonal; bottom down, supports touching the bed only")
     save("c4_band_end_panel", op(cp(body("Panel")), box(*eb, -10, 20), "Intersection"),
@@ -378,7 +379,7 @@ def coupons():
 
 
 def c3(save=None):
-    """Insert coupon: the front-centre (V tip) screw. No insert in this design has a free-standing boss (each sits
+    """Insert coupon: the panel's front-left screw (M7; was the front V tip). No insert in this design has a free-standing boss (each sits
     under solid floor or web), so the body is cut 2 mm over the blind Ø4 hole and printed upside down (cut face on
     the bed: no supports, hole opening upward for the heat-set tool), with its panel piece (countersink)."""
     if save is None:
@@ -387,7 +388,7 @@ def c3(save=None):
             info(name, b)
             log("   ", note)
             mesh(b, os.path.join(COUP, name + ".stl"))
-    sx, sy = g["screws"][4]
+    sx, sy = g["screws"][2]  # M8: the panel's V screw (short insert, in the recessed field)
     src = body("Body")
     z = P["panel_t"] + 0.5
     while src.pointContainment(P3(sx, sy, z)) != adsk.fusion.PointContainment.PointInsidePointContainment:
@@ -395,10 +396,10 @@ def c3(save=None):
     log(f"  c3: insert hole top at z {z:.1f}; body cut at z {z + 2:.1f}")
     bx = (sx - 11.0, sx + 11.0, sy - 14.0, sy + 11.0)
     save("c3_insert_boss_body", move(op(cp(src), box(*bx, -1, z + 2.0), "Intersection"), 0, 0, 0, rot_x180=True),
-         "front-centre (V tip) screw: rim, rabbet, Ø4 x 6 heat-set hole; upside down (flat cut face on the bed), "
+         "panel V screw: rabbet, Ø4 x 3.6 heat-set hole; upside down (flat cut face on the bed), "
          "no supports")
     save("c3_panel_corner", op(cp(body("Panel")), box(*bx, -10, 20), "Intersection"),
-         "panel V tip: countersunk M3 hole; outer face down")
+         "panel at its V screw: countersunk M3 hole in the 0.4 mm recessed field; outer face down")
 
 
 def layout_shot():
@@ -483,3 +484,47 @@ def proto():
     b = put("SnapsPrint", sb[:1], hidden=True).bRepBodies.item(0)
     info("pcbsnap_tpu_x8", b)
     mesh(b, os.path.join(PROTO, "pcbsnap_tpu_x8.stl"))
+
+
+# ---------------------------------------------------------------- step 7: whole body, whole panel, switch fit strip -> prints/
+PRINTS = os.path.join(os.path.dirname(CASE), "prints")
+SEG = {"0": "abcdef", "1": "bc", "4": "bcfg", "5": "acdfg", "7": "abc", "9": "abcdfg"}  # 7-segment digits used below
+
+
+def fit_strip():
+    """1.5 mm strip, 4 MX cutouts 14.00 / 14.05 / 14.10 / 14.15, each size embossed 0.4 mm below it (z 1.5 .. 1.9)."""
+    t, pitch, H = P["plate_t"], 19.05, 28.0
+    sizes = [14.00, 14.05, 14.10, 14.15]
+    cx = [pitch / 2 + i * pitch for i in range(4)]
+    c = put("FitStrip", [], hidden=True)
+    sq = lambda x, s, y0=19.0: [[x - s / 2, y0 - s / 2], [x + s / 2, y0 - s / 2], [x + s / 2, y0 + s / 2], [x - s / 2, y0 + s / 2]]
+    slab(c, "FitStrip", [[[0, 0], [4 * pitch, 0], [4 * pitch, H], [0, H]]] + [sq(x, s) for x, s in zip(cx, sizes)], [0.0, t], True)
+    strip = cp(c.bRepBodies.item(0))
+    w, h, k, gap = 3.0, 6.0, 0.9, 1.0  # digit size, stroke, spacing
+    rects = {"a": (0, w, h - k, h), "d": (0, w, 0, k), "g": (0, w, (h - k) / 2, (h + k) / 2), "f": (0, k, h / 2, h),
+             "e": (0, k, 0, h / 2), "b": (w - k, w, h / 2, h), "c": (w - k, w, 0, h / 2)}
+    for x, s in zip(cx, sizes):
+        txt = f"{s:.2f}"
+        x0 = x - (4 * (w + gap) + k + gap) / 2 + 0.2  # 4 digits and the dot
+        for ch in txt:
+            if ch == ".":
+                op(strip, box(x0, x0 + k, 3.0, 3.0 + k, t - 0.01, t + 0.4), "Union")
+                x0 += k + gap
+                continue
+            for sg in SEG[ch]:
+                a, b, y0, y1 = rects[sg]
+                op(strip, box(x0 + a, x0 + b, 3.0 + y0, 3.0 + y1, t - 0.01, t + 0.4), "Union")
+            x0 += w + gap
+    b = put("FitStripPrint", [to_origin(strip)], hidden=True).bRepBodies.item(0)
+    info("switch_fit_test", b)
+    mesh(b, os.path.join(PRINTS, "switch_fit_test.stl"))
+
+
+def whole():
+    """Whole body and whole panel, as modelled (bottom / outer face down), lowest point on z 0."""
+    os.makedirs(PRINTS, exist_ok=True)
+    for n, f in (("Body", "case_body"), ("Panel", "bottom_panel")):
+        b = put(n + "Print", [to_origin(cp(body(n)))], hidden=True).bRepBodies.item(0)
+        info(f, b)
+        mesh(b, os.path.join(PRINTS, f + ".stl"))
+    fit_strip()

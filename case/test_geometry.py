@@ -131,12 +131,18 @@ def floor_z(lift, X, Y):  # straight from each floor plane's point and normal, i
     return min(zs)
 
 
-need = P["panel_t"] + P["floor_above_panel"]
+need = P["base_min"]  # M7: solid front base (over the panel the floor rule is checked below)
 verts = [p for q in getattr(opening, "geoms", [opening]) for p in q.exterior.coords]
 low = lambda lift: min(floor_z(lift, x, y) for x, y in verts)
 assert abs(g["lift"] / P["lift_step"] - round(g["lift"] / P["lift_step"])) < 1e-9
 assert low(g["lift"]) >= need and low(g["lift"] - P["lift_step"]) < need
 assert abs(low(g["lift"]) - g["floor_min_z"]) < 1e-9
+# M7: over the (rear) panel the floor keeps panel_t + floor_above_panel; in front of it the body is solid to the desk
+ov = opening.intersection(s["panel"].buffer(P["panel_gap_print"]))
+assert min(floor_z(g["lift"], x, y) for q in getattr(ov, "geoms", [ov]) for x, y in q.exterior.coords) >= \
+    P["panel_t"] + P["floor_above_panel"]
+# M7: real bottomed-out Cherry caps (tapered, skirt_bottom_out .. lip) keep the artisan gap to the opening (M6 envelope)
+assert g["cap_gap"] >= P["artisan_gap"], g["cap_gap"]
 
 
 # M2 parts. Plate cutouts (switch + §4 stab: 2 per key >= 2u) sit inside the plate with a web between them.
@@ -205,43 +211,60 @@ board = affinity.translate(u["board"], U4[0, 3], U4[1, 3])
 assert abs(U4[0, 3] - g["ridge_x"]) < 1e-9 and np.allclose(U4[:3, :3], np.diag([-1, 1, -1]))
 assert abs(g["notch_z"][1] - U4[2, 3] - P["udb_air"]) < 1e-9 and abs(g["bay_z"][1] - U4[2, 3] - P["udb_mount"][1]) < 1e-9
 assert P["udb_mount"][1] >= 0.5 and len(u["mounts"]) == 2
-assert s["panel"].contains(board) and abs(board.area - (18 * 16.5 - (4 - math.pi) * 4)) < 0.1
+assert s["panel"].buffer(1.0).contains(board) and abs(board.area - (18 * 16.5 - (4 - math.pi) * 4)) < 0.1
 assert abs(u["receptacle_centre_z"] - (U4[2, 3] - P["udb_t"] - P["usb_receptacle"][2] / 2)) < 1e-9 and 0 < P["usb_recess"] <= 1.5
 assert abs(u["receptacle"].bounds[3] - 16.5 / 2) < 1e-9  # face at the board's back edge
 assert all(u["board"].contains(hl) for hl in u["holes"])
 
-# Screws: exactly 6, all on the ledge; 4 at the panel corners, 1 at the front V, 1 at the back middle, shifted
-# along the ledge just enough to clear the UDB bay (bay = UDB + 0.5, plus the head radius).
+# Screws (M8, user): 3, all in the panel's recessed field just inside its border: the 2 back corners, and one at the
+# panel's V point on the ridge (screw_front_offset: its distance from the V); every countersink head inside the
+# recess, >= 5 mm of floor straight over each (short) insert
 sc = [Point(q) for q in g["screws"]]
-assert len(sc) == 6
-ledge = s["panel"].difference(s["cavity"])
-assert all(ledge.contains(q.buffer(P["screw_head"] / 2 - 0.5)) for q in sc)
-fp = list(s["footprint"].exterior.coords)[:-1]
-bl, br = min(fp[:3], key=lambda q: q[0]), max(fp[:3], key=lambda q: q[0])
-fl, fr = min(fp[3:], key=lambda q: q[0]), max(fp[3:], key=lambda q: q[0])
-vtip = max(fp[3:], key=lambda q: q[1])  # the V's inner corner is the front's rearmost point
-for c in (bl, br, fr, fl, vtip):
-    assert min(q.distance(Point(c)) for q in sc) < 20, c
+assert len(sc) == 3 and g["insert_depths"] == [P["insert_hole_short"][1]] * 3
+rec = g["panel_recess"]
+assert all(rec.buffer(-0.5).contains(q.buffer(P["screw_head"] / 2)) for q in sc)
+assert all(rec.exterior.distance(q) <= P["screw_head"] / 2 + P["screw_recess_margin"] + 0.6 for q in sc[:2])  # at the field's edge
+assert all(0 <= o_ <= 30 for o_ in g["screw_front_offset"]), g["screw_front_offset"]  # V screw: its distance from the V
+gro_all = unary_union([f["grooves"] for f in g["cavity_steps"]["floor"].values()])
+for q in sc:  # >= 5 mm of body straight over each insert (the floor plane, less a relief groove where one runs over it)
+    for a in np.linspace(0, 6.3, 9):
+        x_, y_ = q.x + 2 * math.cos(a), q.y + 2 * math.sin(a)
+        fz = G.surface(Ms.values(), G.FLOOR_W, x_, y_) - (P["relief"][1] if gro_all.contains(Point(x_, y_)) else 0)
+        assert fz - P["panel_t"] - P["insert_hole_short"][1] >= 5.0, (q, fz)
+assert sc[0].x < g["ridge_x"] < sc[1].x and abs(sc[2].x - g["ridge_x"]) < 1.0 and min(sc[0].y, sc[1].y) > sc[2].y + 10
+# the countersink in the 3.6 mm field: what is left under the head's cone
+under_cs = P["panel_t"] - P["panel_recess"][0] - (P["screw_head"] - P["screw_clear"]) / 2
+assert under_cs > 1.9, under_cs  # M7 panel_t 4: 1.94 (target 2 for wood)
+pc = list(s["panel"].exterior.coords)
+tip_ = min(pc, key=lambda q: abs(q[0] - g["ridge_x"]) * 10 + q[1])  # the panel's V tip
+assert s["panel"].contains(unary_union([g["bay"], g["cavity_steps"]["chan"]]).buffer(-0.01)) and \
+    s["panel"].buffer(-P["ledge"] + 0.01).contains(g["cavity_steps"]["chan"]), "channels / bay under the panel"
+assert 0.35 <= s["panel"].area / s["footprint"].area <= 0.65  # about half the underside
+# M7 recessed field on the panel's underside: inside the border, R3+ corners (Ø6 flat end mill), one field
+assert rec.geom_type == "Polygon" and s["panel"].buffer(0.6).contains(rec) and rec.bounds[3] >= s["panel"].bounds[3] - 0.01  # M8: runs out through the back edge
+assert radius_ok(rec, P["panel_recess"][2], skip=s["panel"].exterior.buffer(0.6)) and rec.area > 0.6 * s["panel"].area  # M8: the back corners run out through the edge
 keep = board.buffer(0.5 + P["screw_head"] / 2, join_style="mitre")
 assert not any(keep.intersects(q) for q in sc)
-back = sc[5]
-assert abs(back.x - g["ridge_x"] - u["back_screw_shift"]) < 1e-3 and back.y > board.bounds[1]
-assert keep.intersects(Point(back.x + (0.1 if back.x < g["ridge_x"] else -0.1), back.y))  # no further than needed
 
-# M3: feet cover the corner screw heads and stay on the panel; bay holds the UDB with R >= pocket_r and opens
-# into the cavity (>= 8 mm cable path); the USB notch is centred on the receptacle, open from the panel seam.
+# M7: all four feet press into the body's underside, >= rear_foot_clear from the panel's rabbet; bay holds the UDB
+# with R >= pocket_r and opens into the cavity (>= 8 mm cable path); the USB notch is centred on the receptacle.
 assert len(g["feet"]) == 4
-for f, q in zip(g["feet"], sc[:4]):
-    assert abs(f.area - (20 * 8 + math.pi * 16)) < 0.2 and f.contains(q.buffer(P["screw_head"] / 2)) and s["panel"].buffer(-0.3).contains(f)
-# M6 press-fit pegs: 2 per foot, inside it (>= 1 mm of foot round each), >= 1 mm of panel to the screw's countersink
+for i, f in enumerate(g["feet"]):
+    fl_, fw_ = P["feet"]
+    assert abs(f.area - ((fl_ - fw_) * fw_ + math.pi * fw_ ** 2 / 4)) < 0.2
+    assert s["footprint"].buffer(-1.5).contains(f) and f.distance(s["rabbet"]["print"]) >= P["rear_foot_clear"] - 0.01, i
+# M6 press-fit pegs: 2 per foot, inside it (>= 1 mm of foot round each)
 assert len(g["peg_holes"]) == 8 and len(g["pegs"]) == 8
-for i, (f, q) in enumerate(zip(g["feet"], sc[:4])):
+for i, f in enumerate(g["feet"]):
     for h_ in g["peg_holes"][2 * i:2 * i + 2]:
-        assert f.buffer(-1.0).contains(h_) and h_.distance(q.buffer(P["screw_head"] / 2)) >= 1.0, (i, h_.centroid)
+        assert f.buffer(-1.0).contains(h_.buffer(P["foot_fit"])), (i, h_.centroid)  # >= 1 mm of TPU round each peg
 assert g["bay"].union(g["notch"]).contains(board.buffer(0.25)) and radius_ok(g["bay"], P["pocket_r"])
 assert g["notch"].bounds[0] <= g["bay"].bounds[0] + 0.01 and g["notch"].bounds[2] >= g["bay"].bounds[2] - 0.01
 assert radius_ok(g["notch"], P["pocket_r"])
-assert radius_ok(g["lip_pocket"], P["pocket_r"])  # M5: was R1 (Ø2 tool)
+# M5: was R1 (Ø2 tool). M7: inside the body (the footprint); its outer ends stop square at the rabbet's side walls,
+# where the body's band diagonal leaves the pocket < 0.2 mm tall (skipped, as is the open rear face)
+rims_ = s["footprint"].difference(g["rabbet_lean"])
+assert radius_ok(g["lip_pocket"], P["pocket_r"], skip=rims_.buffer(0.01).boundary.union(rims_.buffer(5).difference(s["footprint"])))
 # the slot's floor corner (R usb_r[1] seen from behind) clears the UDB board's rear corners
 sw, rr = (g["notch"].bounds[2] - g["notch"].bounds[0]) / 2, P["usb_r"][1]
 # M5: now the slot's roof corners (R usb_r[0]) clear the flipped board's top corners
@@ -254,12 +277,11 @@ assert abs((nx0 + nx1) / 2 - U4[0, 3]) < 1e-9 and abs(g["usb_centre"][1] - rz) <
 assert all(g["walls"][k] >= 5 - 1e-6 for k in ("bezel", "web", "rabbet_to_footprint", "cavity_to_footprint",
                                                 "insert_to_cavity", "bay_rear_m3", "bay_rear_m4", "insert_to_lip", "cavity_to_lip"))
 
-# M6 pocket floor: one plane per half parallel to its PCB (same normal), floor_clear + stack_raise under the PCB
+# M6 pocket floor: one plane per half parallel to its PCB (same normal), floor_air under the PCB
 # underside, with relief grooves relief[1] deeper (R3 corners, off the walls). On a 2 mm grid over each PCB (islands
 # excluded) the air is that, and nothing (grooves included) is below the H_front rule height.
 cs = g["cavity_steps"]
 WB = -(P["plate_to_pcb"] + P["pcb_t"])
-zbase = P["panel_t"] + P["floor_above_panel"]
 isl = unary_union([q["poly"] for q in cs["islands"]])
 fz_at = lambda h, pt: G.z_at(Ms[h], cs["floor"][h]["groove_w"][0] if cs["floor"][h]["grooves"].contains(pt) else
                              cs["floor"][h]["w"], pt.x, pt.y)
@@ -288,7 +310,12 @@ for h, f in cs["floor"].items():
     sock_cover[h] = (len(d["sockets"]), n_part, n_wall)
     assert not gr.intersects(cs["stubs"].buffer(P["island_clear"] - 0.01)), h  # off the JST breakthroughs
     for q in getattr(gr, "geoms", [gr]):
-        assert all(G.z_at(M, f["groove_w"][0], x, y) >= zbase - 1e-6 for x, y in q.exterior.coords), h
+        # M7: >= base_min_groove of body under a groove (over the desk in front, over the rabbet ceiling over the panel)
+        pz_ = s["rabbet"]["print"]
+        for part_, base_ in ((q.difference(pz_), P["base_min_groove"]), (q.intersection(pz_), P["panel_t"] + P["base_min_groove"])):
+            for g_ in getattr(part_, "geoms", [part_]):
+                if not g_.is_empty and g_.area > 1e-6:
+                    assert all(G.z_at(M, f["groove_w"][0], x, y) >= base_ - 1e-6 for x, y in g_.exterior.coords), h
     pcbw = world(M, WB, d["pcb"])
     x0, y0, x1, y1 = pcbw.bounds
     lo_hi = []
@@ -350,8 +377,8 @@ assert P["half_spread"][0] == P["half_spread"][1] and abs(g["web_sym"][0] - g["w
 assert abs(g["outline_offset"] - 2.31) < 0.02, g["outline_offset"]
 # M6: the V's inner corner on the ridge (one front bezel grown just enough), both front bezels >= bezel_front
 assert abs(g["v_offset"]) < 0.05 and min(g["front_bezels"]) >= P["bezel_front"] - 1e-9, (g["v_offset"], g["front_bezels"])
-vsc = min(sc, key=lambda q: abs(q.x - g["ridge_x"]) + abs(q.y - vtip[1]))
-assert abs(vsc.x - g["ridge_x"]) < 0.5, vsc  # the front screw at the V moved with it
+# M7: the panel's V tip on the ridge too (its screw is checked above)
+assert abs(tip_[0] - g["ridge_x"]) < 1.0, tip_
 for h, f in cs["floor"].items():  # M6: >= 3 mm of material between a groove and a cable channel / the UDB bay
     for void, ztop_ in ((cs["chan"], cs["chan_z"][1]), (g["bay"], g["bay_z"][1])):
         ov = f["grooves"].intersection(void)

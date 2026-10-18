@@ -338,31 +338,31 @@ def edge_round(c, edges, r, chamfer=False, chain=True):
 
 
 def lip_ramps(c, g, dz, zone, z0=-2.0):
-    """Tool for the rear band's ends: outside a straight diagonal from the lip top at each end (strip_lip[2] in from
-    its seam point, slope lip height : strip_lip[2]) all the way down past the desk, so seen from behind the band end
-    is one clean line from its top to the bottom edge (M5; before, it stopped at the seam above a square panel step).
-    Drawn in XZ, extruded through Y and kept only inside zone (the rear strip: polygons in plan), so it trims the
-    panel's run-out and lip, or (dz = the gap) the body's rabbet and lip pocket, and nothing else. The diagonal is
-    z = f(x): the panel's from its top, the body's from below, any flat or ball end mill."""
+    """Tool for the rear band's ends: outside a straight diagonal from the band's top vertex down to the panel's outer
+    top corner at the side rim (M7, user: one long shallow diagonal, no flat run-out; lip_ends = the feet, lip_run =
+    their horizontal runs), continued past the desk. Drawn in XZ, extruded through Y and kept only inside zone (the
+    rear strip: polygons in plan), so it trims the panel's lip, or (dz = the gap) the body's rabbet and lip pocket,
+    and nothing else. The diagonal is z = f(x): the panel's from its top, the body's from below, any flat or ball
+    end mill."""
     P = g["params"]
-    L, h = P["strip_lip"][2], g["lip_z"][1] - g["lip_z"][0]
+    h = g["lip_z"][1] - g["lip_z"][0]
     zt = g["lip_z"][1]
-    nl = math.hypot(L, h)
-    nx_, nz_ = -h / nl, L / nl  # unit normal of the diagonal, toward the tool (outer, upper) side
     R = P["strip_lip_r"]  # M5: the band's top corner (top edge into the diagonal), rounded; the body's by R + dz
-    cx_, cz_ = L + R * (nl - L) / h, zt - R  # arc centre (local dx, z), on the band side
     r_ = R + dz
-    t1 = (cx_ + r_ * nx_, cz_ + r_ * nz_)  # on the (offset) diagonal
     zb = -0.5  # below the desk
-    s_ = (t1[1] - zb) / (h / nl)
-    foot = (t1[0] - s_ * L / nl, zb)
-    a0, a1 = math.atan2(nz_, nx_), math.pi / 2
-    arc = [(cx_ + r_ * math.cos(a0 + (a1 - a0) * k / 16), cz_ + r_ * math.sin(a0 + (a1 - a0) * k / 16)) for k in range(17)]
     sk = c.sketches.add(c.xZConstructionPlane)
     sk.name = "LipEnds"
     pt = lambda x, z: sk.modelToSketchSpace(P3(x, 0, z))
     lines = sk.sketchCurves.sketchLines
-    for xe, sg in zip(g["lip_ends"], (1, -1)):  # the band runs +x from the left end, -x from the right one
+    for xe, L, sg in zip(g["lip_ends"], g["lip_run"], (1, -1)):  # the band runs +x from the left end, -x from the right one
+        nl = math.hypot(L, h)
+        nx_, nz_ = -h / nl, L / nl  # unit normal of the diagonal, toward the tool (outer, upper) side
+        cx_, cz_ = L + R * (nl - L) / h, zt - R  # arc centre (local dx, z), on the band side
+        t1 = (cx_ + r_ * nx_, cz_ + r_ * nz_)  # on the (offset) diagonal
+        s_ = (t1[1] - zb) / (h / nl)
+        foot = (t1[0] - s_ * L / nl, zb)
+        a0, a1 = math.atan2(nz_, nx_), math.pi / 2
+        arc = [(cx_ + r_ * math.cos(a0 + (a1 - a0) * k / 16), cz_ + r_ * math.sin(a0 + (a1 - a0) * k / 16)) for k in range(17)]
         X = lambda dx: xe + sg * dx
         top = zt + dz + 3
         loop = [foot] + arc + [(cx_, top), (foot[0] - 5, top), (foot[0] - 5, zb)]
@@ -389,6 +389,52 @@ def lip_ramps(c, g, dz, zone, z0=-2.0):
     return tools
 
 
+def band_recess(c, g):
+    """M7: the 0.4 mm recessed field on the panel's rear face (edge + band), one per rear lean plane: its (x, z)
+    outline extruded through Y, kept only within the recess depth behind that plane, cut from the Panel. Needs a side
+    setup when machined (the face is near-vertical); the undercut check lists those faces as 'side'."""
+    P = g["params"]
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    lb = g["lower_band"]
+    tools = []
+    for idx, side in ((0, "left"), (1, "right")):
+        poly = g["band_recess"][side]
+        sk = c.sketches.add(c.xZConstructionPlane)
+        sk.name = "BandRecess" + side
+        pts = [sk.modelToSketchSpace(P3(x, 0, z)) for x, z in poly]
+        lines, prev, first = sk.sketchCurves.sketchLines, None, None
+        for i in range(len(pts)):
+            a_ = prev.endSketchPoint if prev else pts[0]
+            b_ = first.startSketchPoint if i == len(pts) - 1 else pts[i + 1]
+            prev = lines.addByTwoPoints(a_, b_)
+            first = first or prev
+        prof = max((sk.profiles.item(i) for i in range(sk.profiles.count)), key=lambda q: q.areaProperties().area)
+        inp = c.features.extrudeFeatures.createInput(prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+        inp.setSymmetricExtent(adsk.core.ValueInput.createByString("300 mm"), True)
+        prism = c.features.extrudeFeatures.add(inp).bodies.item(0)
+        c0, c1, N = lb["crease"][idx], lb["crease"][idx + 1], lb["normals"][idx]
+        t = [c1[i] - c0[i] for i in range(3)]
+        lt = math.sqrt(sum(v * v for v in t))
+        t = [v / lt for v in t]
+        mx = (c0[0] + c1[0]) / 2
+        z_ = 3.0
+        y_ = c0[1] - (N[0] * (mx - c0[0]) + N[2] * (z_ - c0[2])) / N[1]  # on the lean plane at (mx, z_)
+        dep = P["panel_recess"][0]
+        ctr = P3(mx + N[0] * (1.0 - dep) / 2, y_ + N[1] * (1.0 - dep) / 2, z_ + N[2] * (1.0 - dep) / 2)
+        bx = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
+            ctr, adsk.core.Vector3D.create(*t), adsk.core.Vector3D.create(*N), 400 * MM, (1.0 + dep) * MM, 100 * MM))
+        tp = tbm.copy(prism)
+        tbm.booleanOperation(tp, bx, adsk.fusion.BooleanTypes.IntersectionBooleanType)
+        c.features.removeFeatures.add(prism)
+        bf = c.features.baseFeatures.add()
+        bf.startEdit()
+        c.bRepBodies.add(tp, bf).name = "BandRecessTool" + side
+        bf.finishEdit()
+        tools.append(c.bRepBodies.itemByName("BandRecessTool" + side))
+    cut(c, c.bRepBodies.itemByName("Panel"), tools)
+    log(f"M7: band recess {P['panel_recess'][0]} mm on the panel's rear face (2 fields, USB frame)")
+
+
 def build_case(root, g):
     """M3: Body = outline prism below both top planes, minus the two pockets (opening prism above its floor plane),
     the rabbet, the bottom cavity (ceiling cut to the pocket-floor planes, since it runs under the bezels and the
@@ -407,9 +453,10 @@ def build_case(root, g):
     many = lambda q: q if isinstance(q[0][0], list) else [q]
     for h, f in cs["floor"].items():
         X = h[0].upper()
-        one("Open" + X, many(f["open"]), [P["panel_t"] + 1.5, hi + 5])
-        one("Shelf" + X, many(f["open_run"]), [P["panel_t"] + 0.5, hi + 5])  # floor plane .. groove plane, less the grooves
-        gr = slab(c, "Grooves" + X, many(f["grooves"]), [P["panel_t"] + 0.5, hi + 5])
+        # (M7: the void tools start at z 1.0, below the lowest groove plane over the solid front; the planes trim them)
+        one("Open" + X, many(f["open"]), [1.0, hi + 5])
+        one("Shelf" + X, many(f["open_run"]), [1.0, hi + 5])  # floor plane .. groove plane, less the grooves
+        gr = slab(c, "Grooves" + X, many(f["grooves"]), [1.0, hi + 5])
         for i in range(gr.bodies.count):
             gr.bodies.item(i).name = f"Groove{X}{i}"
         for i, q in enumerate(q_ for q_ in cs["islands"] if q_["half"] == h):
@@ -436,8 +483,8 @@ def build_case(root, g):
     # M4 rear lip: the strip rises up the rear face to the USB centre; the slot runs through it; the body is cut back
     lip = one("Lip", [g["lip"]], g["lip_z"])
     cut(c, panel, [lip], op=adsk.fusion.FeatureOperations.JoinFeatureOperation)
-    # band ends: the diagonal trims the band only (above the seam). M6 (user): the panel's underside at the back is
-    # one flat surface square to the rear edge, so its run-out is no longer trimmed (the diagonal lands on the seam)
+    # band ends: the diagonal trims the band only (above the seam); the panel's underside at the back stays one flat
+    # surface square to the rear edge. M7 (user): the diagonal lands on the panel's outer top corner at the side rim
     cut(c, B_("Panel"), lip_ramps(c, g, 0.0, g["rear_zone_panel"], P["panel_t"]))
     cut(c, B_("Rabbet"), lip_ramps(c, g, P["panel_gap_print"], g["rear_zone_body"], P["panel_t"] + P["panel_gap_print"]))
     # the slot through the lip, cut before the UDB bosses are added (the rear pair stands in the slot's footprint)
@@ -487,8 +534,8 @@ def build_case(root, g):
     rh, rc, (di, dd) = P["screw_head"] / 2, P["screw_clear"] / 2, P["insert_hole"]
     cyl = lambda a, ra, b, rb: tbm.createCylinderOrCone(a, ra * MM, b, rb * MM)  # radii in mm
     for i, (x, y) in enumerate(g["screws"]):
-        z0 = P["foot_depth"] if i < 4 else 0.0  # corner screws sit in the foot pockets
-        d_ = P["insert_hole_short"][1] if i < 2 else dd  # M5: short inserts at the two back corners (under the pocket)
+        z0 = P["panel_recess"][0]  # M7: every screw sits in the panel's recessed field (the head seats on its floor)
+        d_ = g["insert_depths"][i]  # M7: per screw (short where the pocket floor is low over it)
         tmp[f"Insert{i + 1}"] = cyl(P3(x, y, P["panel_t"] - 0.01), di / 2, P3(x, y, P["panel_t"] + d_), di / 2)
         cs = cyl(P3(x, y, z0 - 0.01), rh + 0.01, P3(x, y, z0 + rh - rc), rc)
         tbm.booleanOperation(cs, cyl(P3(x, y, -1), rc, P3(x, y, P["panel_t"] + 1), rc),
@@ -628,7 +675,24 @@ def build_case(root, g):
     log(f"M4: R{P['top_round']} top round ({len(rim_edges)} edges), {P['opening_chamfer']} mm x 45 deg opening "
         f"chamfer on {len(g['chamfer_top'])} openings")
     panel = B("Panel")
-    cut(c, panel, feet_bodies + peg_hole_bodies + [B(f"Countersink{i + 1}") for i in range(len(g["screws"]))])
+    # M7: feet (and any peg hole) whose centre lies on the panel go into it, the rest into the body's underside
+    def inside(pt, ring):  # even-odd ray cast
+        x, y, c_ = pt[0], pt[1], False
+        for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+            if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+                c_ = not c_
+        return c_
+    ctr = lambda b: ((b.boundingBox.minPoint.x + b.boundingBox.maxPoint.x) / 2 / MM, (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2 / MM)
+    on_panel = lambda b: inside(ctr(b), g["panel_lean"])
+    rear_ = [b for b in feet_bodies + peg_hole_bodies if on_panel(b)]
+    front_ = [b for b in feet_bodies + peg_hole_bodies if not on_panel(b)]
+    cut(c, panel, rear_ + [B(f"Countersink{i + 1}") for i in range(len(g["screws"]))])
+    if front_:
+        cut(c, B("Body"), front_)
+    # M7: the shallow recessed field on the panel's outer face (clear of the countersinks and the rear feet)
+    cut(c, B("Panel"), [one("PanelRecess", [g["panel_recess"]], [-1.0, P["panel_recess"][0]])])
+    band_recess(c, g)
+    log(f"M7: feet pockets and peg holes: {len(rear_)} in the panel, {len(front_)} in the body")
     # USB slot corners: the edges along Y at the slot's sides, roof (body) and floor (panel top, in the lip)
     nx = [p[0] for p in g["notch"]]
     def slot_edges(b, z):
@@ -714,7 +778,9 @@ def check_m3(design, g, halves, udb, case):
     rcx, rcz = (rec.minPoint.x + rec.maxPoint.x) / 2 / MM, (rec.minPoint.z + rec.maxPoint.z) / 2 / MM
     # probe the notch edges along x and z with point containment (0.01 mm steps): the sides 1 mm behind the bay (ahead
     # of the lip pocket), the top between the UDB rest pad and the rear face
-    y_side, y_top = min(p[1] for p in g["notch"]) + P["pocket_r"] + 1.0, g["udb"]["pad"]["y"][1] + 0.5
+    lp_y = min(p[1] for p in (g["lip_pocket"] if isinstance(g["lip_pocket"][0][0], (int, float)) else g["lip_pocket"][0])
+               if abs(p[0] - g["ridge_x"]) < 20)  # M7 (panel_t 4: the slot's sides end at the band pocket sooner)
+    y_side, y_top = min(min(p[1] for p in g["notch"]) + P["pocket_r"] + 1.0, lp_y - 0.5), g["udb"]["pad"]["y"][1] + 0.5
     inside = lambda x, z, y: body.pointContainment(P3(x, y, z)) != adsk.fusion.PointContainment.PointOutsidePointContainment
     edge = lambda f, a, b: next(a + (b - a) * i / 2000 for i in range(2001) if f(a + (b - a) * i / 2000))
     xl, xr = edge(lambda x: inside(x, rcz, y_side), rcx, rcx - 15), edge(lambda x: inside(x, rcz, y_side), rcx, rcx + 15)
@@ -801,10 +867,10 @@ def check_m3(design, g, halves, udb, case):
         return z - z0
     ri = P["insert_hole"][0] / 2
     cover = min(up(x + ri * math.cos(a) * k_, y + ri * math.sin(a) * k_,
-                   P["panel_t"] + (P["insert_hole_short"][1] if i < 2 else P["insert_hole"][1]))
+                   P["panel_t"] + g["insert_depths"][i])
                 for i, (x, y) in enumerate(g["screws"]) for k_ in (0, 1) for a in [j * math.pi / 4 for j in range(8)])
     ok["insert_cover"] = cover >= 5 - 1e-4
-    log(f"CHECK M3 inserts: material over each (straight up, 9 points; back corners short, under bosses) >= 5 mm: {cover:.2f} mm -> "
+    log(f"CHECK M3 inserts: material over each (straight up, 9 points; short inserts where the floor is low) >= 5 mm: {cover:.2f} mm -> "
         f"{'PASS' if ok['insert_cover'] else 'FAIL'}")
     log(f"CHECK thinnest wall >= 5 mm: min {min(walls.values()):.2f} mm; under 5: {thin} -> "
         f"{'PASS' if not thin else 'FAIL'}  (plan values from geometry.py, M4 lean included: {g['walls']})")
@@ -1010,6 +1076,24 @@ def check_m5(g, case):
         return False
 
     vis = {b.name: b.isLightBulbOn for b in c.bRepBodies}
+    def pip(pt, ring):
+        x, y, c_ = pt[0], pt[1], False
+        for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+            if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+                c_ = not c_
+        return c_
+    lb_ = g["lower_band"]
+    def band_face(f):  # a face of the rear-face recess: within its (x, z) field (+0.3) and <= 0.6 mm behind the lean plane
+        p = f.pointOnFace
+        x, y, z = p.x / MM, p.y / MM, p.z / MM
+        for idx, side in ((0, "left"), (1, "right")):
+            c0, N = lb_["crease"][idx], lb_["normals"][idx]
+            d = N[0] * (x - c0[0]) + N[1] * (y - c0[1]) + N[2] * (z - c0[2])
+            ring = g["band_recess"][side]
+            near = pip((x, z), ring) or min(math.hypot(x - a, z - b) for a, b in ring) < 0.3
+            if -0.6 <= d <= 0.05 and near:
+                return True
+        return False
     ok, report = {}, {}
     for name in ("Body", "Panel"):
         for b in c.bRepBodies:
@@ -1048,8 +1132,10 @@ def check_m5(g, case):
                 # (M6 tightened: <= 0.5 mm2, and a sliver must pass the same test: no area-only pass)
                 if all(off(p, n) == IN_ for (p, n), a, b_ in zip(S, up, dn) if not (a or b_)) and f.area * 100 < 0.5:
                     op = "hairline"
+            if op == "NONE" and name == "Panel" and band_face(f):  # M7: the rear-face recess: a side setup, not +-Z
+                op = "side"
             count[op] = count.get(op, 0) + 1
-            if op in ("NONE", "graze", "hairline") or rule:
+            if op in ("NONE", "graze", "hairline", "side") or rule:
                 at = [(round(p.x / MM, 2), round(p.y / MM, 2), round(p.z / MM, 2)) for (p, n), a, b_ in zip(S, up, dn) if not (a or b_)]
                 bad.append((k, op, rule, round(f.area * 100, 3), at[:2]))
         ok[name] = not any(q[1] == "NONE" or q[2] for q in bad)
@@ -1057,6 +1143,8 @@ def check_m5(g, case):
         log(f"CHECK undercuts, {name}: {body.faces.count} faces, by op {count}; unreachable / crease-rule faces "
             f"{[q for q in bad if q[1] == 'NONE' or q[2]]} -> {'PASS' if ok[name] else 'FAIL'}")
         for q in bad:
+            if q[1] == "side":
+                log(f"  info: {name} face {q[0]} ({q[3]} mm2): rear-face recess, needs the side setup (panel on edge / angle plate)")
             if q[1] in ("graze", "hairline"):
                 log(f"  info: {name} face {q[0]} ({q[3]} mm2): " + ("rays graze a neighbour (reached 0.03 mm aside)" if q[1] == "graze"
                     else "hairline crevice side (< 0.03 mm wide, < 0.5 mm2)") + f" at {q[4]}")

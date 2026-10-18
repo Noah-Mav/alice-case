@@ -31,12 +31,13 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # 8/11 -> 7/9.5, crease 10 -> 9, lower_cant 6 -> 8, panel_t 4 -> 3, floor_above_panel 3 -> 2
     "typing_angle": 6.0, "tent": 4.0,  # tent 5 -> 4: user at M4 (back wall too tall); typing 7 -> 6: user at M6
     "plate_t": 1.5, "cutout": 14.0, "cutout_print": 14.05, "plate_to_pcb": 5.0, "pcb_t": 1.6, "socket_h": 1.8,
-    "floor_clear": 3.0, "lip": 2.0, "skirt_bottom_out": 1.6, "artisan_gap": 1.5, "snap_gap": 0.9, "plate_wall_gap": 1.0,
+    "lip": 6.0, "skirt_bottom_out": 2.0,  # M7: Cherry/GMK skirt bottomed out (rest 6.0, verified, see keycaps.py); lip 2.0 -> 6.0 (user: skirt level with the case edge at rest): stack 0.5 lower (solid front base), walls up the rest
+    "artisan_gap": 1.5, "snap_gap": 0.9, "plate_wall_gap": 1.0,
     "bezel_side": 6.0, "bezel_front": 7.0, "bezel_back": 9.5,
     "pocket_r": 3.0, "cavity_r": 6.0, "outer_r": 3.0, "top_round": 1.0, "opening_chamfer": 0.75,
     "crease_mode": "front_horizontal",  # M6 (user): the chosen design, front faces level ("deepening" = the M5 rule)
     "crease_depth": 9.0, "lower_back": 0.5,  # crease: 10 mm on the front, lower band = lower_back x height at the back centre
-    "lower_cant": 8.0, "panel_t": 3.0, "rim": 6.0, "rear_strip_end": 6.0,  # M6 (user): = rim, so the back edge runs square into the side rims (was 10: an inset step at each back corner)
+    "lower_cant": 8.0, "panel_t": 4.0, "rim": 6.0, "rear_strip_end": 6.0,  # M6 (user): = rim, so the back edge runs square into the side rims (was 10: an inset step at each back corner)
     # M4: the strip's lip rises up the rear face to the USB centre (CloudNine's seam runs through the port); it
     # meets the seam this far from each rear corner, is this thick at the desk (the lean adds ~0.4 mm at its top),
     # and its top edge runs down to the seam over the last 7.2 mm in a straight diagonal (1:2, ~27 deg), so seen
@@ -48,7 +49,8 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # is 22 wide (bay 19) so the floor R3 clears the UDB board's rear corners (0.3 mm), which sit inside the lip.
     "usb_r": [3.0, 3.0], "usb_slot_w": 22.0,
     "panel_gap_wood_fb": 0.5, "panel_gap_wood_lr": 0.1, "panel_gap_print": 0.2,
-    "ledge": 14.0, "feet": [28.0, 8.0], "foot_depth": 1.0, "foot_proud": 2.0,
+    "ledge": 14.0, "feet": [28.0, 6.0],  # M7 (user): 8 -> 6 wide (no longer covering screws); Ø3.3 pegs keep 1.35 of TPU each side
+    "foot_depth": 1.0, "foot_proud": 2.0,
     # M6 (user): removable press-fit TPU test feet: the plug in the pocket is foot_fit oversize per side. Pocket depth
     # stays 1.0: the corner screws' countersinks start at the pocket floor and need 1.66 of the 3.0 panel (2.0 deep
     # would put the heads 0.66 into the insert / rabbet ceiling)
@@ -57,7 +59,7 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # hole depth, the first peg's distance from the corner screw (>= 1 mm wall to its countersink); the second sits
     # at the foot's far round end. The pegs are foot_fit oversize per side; the pocket stays for location
     "foot_peg": [3.0, 2.0, 6.0], "usb_opening": [12.0, 7.2],  # height used; the opening is now the bay-wide slot
-    # screws: 6, one at each panel corner (under the feet), mid back (shifted clear of the UDB bay), front V point
+    # screws: 5, one at each panel corner (under the feet) and the front V point (M7, user: the mid-back one dropped)
     "udb": [18.0, 16.5],            # §6.9 Unified Daughterboard C3, at the back on the ridge
     "udb_r": 2.0, "udb_holes": [14.0, 12.5], "udb_hole_d": 2.2, "udb_t": 1.6, "udb_air": 0.5,
     "usb_receptacle": [8.94, 7.35, 3.21],  # HRO TYPE-C-31-M-12 w x depth x h, on the UDB top, face at the board edge
@@ -75,8 +77,9 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     "screw_clear": 3.4,             # M3 clearance hole in the panel (90° countersink to screw_head)
     "insert_hole": [4.0, 6.0],      # print: heat-set M3 x 5.7 hole, diameter and depth above the rabbet ceiling (M5: 6.5 -> 6.0)
     # M5: the two back-corner screws sit under the pocket floor; short inserts there keep >= 5 mm above them. Print:
-    # M3 x 3 short heat-set (e.g. CNC Kitchen) in Ø4.0 x 4.0. Wood: a <= 4 mm long M3 insert (short knife-thread).
-    "insert_hole_short": [4.0, 4.0],
+    # M3 x 3 short heat-set (e.g. CNC Kitchen) in Ø4.0 x 3.6 (M7). Wood: a <= 3.5 mm long M3 insert.
+    # M7: 4.0 -> 3.6 deep with the stack 1.2 lower (lip 3.2): the back-left boss would meet a hotswap socket by 0.3
+    "insert_hole_short": [4.0, 3.6],
     # M5: the UDB hangs upside down (components toward the panel) from the bay ceiling, 0.5 mm (udb_air) under the
     # slot roof. The front pair of holes gets body standoffs: diameter, height (= the air over the board there). The
     # rear pair sits 3 mm inside the rear face, under the slot roof: no room for an insert with a 5 mm wall, so no
@@ -84,10 +87,28 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     "udb_mount": [6.0, 1.0],
     # M2 insert hole in each standoff, diameter x depth from the board. Print: heat-set M2 x 3 (OD ~3.6) in Ø3.2 x 4.
     # Wood: brass knife-thread M2 x 4 (OD ~3.5-4), pilot per its datasheet (~Ø3.0-3.2 x 5), test in scrap.
-    "udb_insert": [3.2, 5.0],
+    "udb_insert": [3.2, 3.6],  # M7: 5.0 -> 3.6 (stack 0.5 lower, UDB 1 mm higher with panel_t 4: the boss over it stays 2 mm under the PCB); M2 x 3 inserts
     "stab": {"w": 6.75, "h": 14.0, "y_top": 6.0, "y_bottom": -8.0, "x": 11.938, "min_w": 2.0},
-    "stack_raise": 1.5,             # M6: stack raised in the shell (= old lip 3.5 - lip); H_front rule reference below
-    "floor_above_panel": 2.0,       # §4 H_front rule: pocket floor >= panel_t + this above the desk (M5: 3 -> 2)
+    # M7: the opening's design envelope (w from .. to), frozen at the M6 numbers so the walls, the outline in plan, the
+    # PCBs and the snap spots stay put while the bezel top rose. Not the cap skirt (that is skirt_bottom_out); the
+    # real caps are checked against the opening (cap_gap)
+    "opening_env": [1.6, 2.0],
+    # M7: air between the PCB underside and the pocket floor plane (the grooves add relief[1]); foam is 3-3.5 mm.
+    # User chose lip 3.2 / air 3.5 over 2.7 / 4.0 (more like a common custom; front floor rule is the limit)
+    "floor_air": 3.5,
+    "floor_above_panel": 2.0,       # §4 floor rule over the panel: pocket floor >= panel_t + this above the desk (M5: 3 -> 2)
+    # M7 (user): solid front base. The panel covers only the rear (bay, channels, USB): a pentagon whose front is the
+    # case's front V moved back panel_shift (tip on the ridge). In front of it the body is solid to the desk:
+    # >= base_min of body under the pocket floor, >= base_min_groove under the relief grooves (H_front rule)
+    "panel_shift": 50.0,  # (M7 panel_t 4: 41 -> 50 brings the side-front corners to the screws' first sound spots; the bay and channels stay covered)
+    "panel_front_r": 6.0, "panel_front_screw_dx": 55.0, "rear_foot_clear": 3.0, "band_end_run": 21.2, "screw_recess_margin": 1.0,
+    # M7 (user, reference photo): a shallow recessed field on the panel's underside: depth, border of full panel all
+    # round, its own corner radius (>= the Ø6 flat end mill's R3), and full-thickness tabs round each screw countersink
+    "panel_recess": [0.4, 3.5, 3.0, 1.5],
+    # M7 (user): the same 0.4 mm recess on the panel's rear face (its edge and the band): border (smaller than the
+    # bottom's 3.5: the face is only 7.6 mm tall), corner radius; a full-thickness frame of the same border round the
+    # USB notch. Drawn in (x, z) on each rear lean plane; cut on an extra setup (the panel on edge / angle plate)
+    "band_recess": [1.5, 1.5], "base_min": 4.5, "base_min_groove": 3.5,
     # PCBsnap pillars (M6: posts in the snap's centre notch, the "O-ring post" it locks onto): width along the wall
     # (its R3 wall fillets reach ~1.7 mm along the wall at the spine, inside the 7 mm notch), depth from the wall, top below the PCB underside, corner radius; cable channel height
     "relief": [7.0, 1.25],  # M6 floor relief grooves: notch diameter / 1.5 (> Ø6 tool), depth below the floor plane
@@ -100,7 +121,7 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # from photos (6-8); measure a real snap, and if its notch is narrower, revisit the fillet or the post
     "pillar_fillet": 1.5,
     "cable_channel": 13.0,  # > 2 cavity_r so the R6 opening keeps it
-    "lift_step": 0.5,               # H_front rounding
+    "lift_step": 0.1,               # H_front rounding (M7: 0.5 -> 0.1, so the stack sits where the floor rule puts it)
     "ridge_clear": 0.5,             # §6.6 PCB/plate clip at the ridge
     # M5: each half moved outward along layout x (left, right; mm) before the transforms, widening the centre web;
     # the ridge sits at the key-gap midpoint, so the web is symmetric about it (the outline centre is not: the
@@ -119,9 +140,8 @@ SOCKET = (-8.4, -7.0, 7.2, -0.6)
 
 # MX centre post (Ø4) sticks out below the PCB: JST keep-out. ponytail: ignores 5-pin pegs; add if PCBs use them.
 POST_R = 2.0
-# M6 (user): the plate/PCB/switch/keycap stack sits stack_raise higher inside an unchanged shell (lip 3.5 -> 2.0), so the
-# H_front rule keeps its old reference: the floor plane floor_clear + stack_raise under the PCB underside, along the normal
-FLOOR_W = -(P["plate_to_pcb"] + P["pcb_t"] + P["floor_clear"] + P["stack_raise"])
+# M7: the pocket floor plane, floor_air under the PCB underside along the normal
+FLOOR_W = -(P["plate_to_pcb"] + P["pcb_t"] + P["floor_air"])
 PCB_MID_W = -(P["plate_to_pcb"] + P["pcb_t"] / 2)
 
 
@@ -334,7 +354,7 @@ def _build(lay):
 
     # §6.1 key envelopes: footprint box from skirt-at-bottom-out to the bezel top, projected to plan
     env = [MultiPoint([world(M0[o["half"]], *flip(c), w) for c in alice.footprint(o)
-                       for w in (P["skirt_bottom_out"], P["lip"])]).convex_hull for o in caps]
+                       for w in P["opening_env"]]).convex_hull for o in caps]
     # §6.2 opening, plus §7's R0.5 on the outward material corners (closing only ever enlarges the opening)
     opening = unary_union(env).buffer(-1.5).buffer(1.5 + P["artisan_gap"])
     opening = opening.buffer(P["stagger_r"]).buffer(-P["stagger_r"])
@@ -425,11 +445,26 @@ def _build(lay):
     outline_sharp = Polygon(sharp)
     outline = rnd(P["outer_r"], outline_sharp)
 
-    # H_front: smallest lift (rounded up) putting the pocket floor >= panel_t + 3 above the desk everywhere
-    need = P["panel_t"] + P["floor_above_panel"]
+    # H_front: smallest lift (rounded up) putting the pocket floor >= base_min above the desk (M7: solid front; over
+    # the panel, further back, the floor is far higher than panel_t + floor_above_panel: tested)
+    need = P["base_min"]
     low = min(surface(M0.values(), FLOOR_W, x, y) for g_ in getattr(opening, "geoms", [opening]) for x, y in g_.exterior.coords)
     lift = math.ceil((need - low) / P["lift_step"] - 1e-9) * P["lift_step"]
     Ms = {"left": matrix(1, ridge, lift), "right": matrix(-1, ridge, lift)}
+    # M7: the real caps (bottomed out, skirt_bottom_out .. lip) against the opening. Cherry profile (KeyV2, GMK based):
+    # base 18.16 (0.445 inside the 19.05 pitch), top 6.31 narrower and 14.64 deep, set 2 mm back, over 7.45 (R2, the
+    # least lean of the rows used): per mm up the sides come in 0.42, the front 0.50, the back goes out 0.03
+    def cap_at(o, w):
+        d_ = w - P["skirt_bottom_out"]
+        side, front, back = 0.445 + 0.42 * d_, 0.445 + 0.50 * d_, 0.445 - 0.03 * d_
+        ends = [np.array(flip(c)) for c in alice.footprint(o, 0.0, 2.0)]
+        a_, b_ = ends[0], max(ends, key=lambda e: np.linalg.norm(e - ends[0]))
+        vb = (b_ - a_) / np.linalg.norm(b_ - a_) * (1 if b_[1] > a_[1] else -1)  # the key's +v (back), local
+        sh = vb * (front - back) / 2
+        return [tuple((Ms[o["half"]] @ [*(np.array(flip(c)) + sh), w, 1])[:2])
+                for c in alice.footprint(o, o["key"]["w"] * alice.U - 2 * side, alice.U - front - back)]
+    env_real = [MultiPoint(cap_at(o, P["skirt_bottom_out"]) + cap_at(o, P["lip"])).convex_hull for o in caps]
+    cap_gap = min(e.distance(opening.boundary) if opening.contains(e) else -1.0 for e in env_real)
     top = lambda x, y: surface(Ms.values(), P["lip"], x, y)
     lt, rt, rb, v, lb = sharp
     back_mid = (ridge, lt[1] + (rt[1] - lt[1]) * (ridge - lt[0]) / (rt[0] - lt[0]))
@@ -482,7 +517,37 @@ def _build(lay):
     back = LineString([foot_pts[0], foot_pts[1], foot_pts[2]])  # back-left, ridge, back-right
     strip = ops.substring(back, P["rear_strip_end"], back.length - P["rear_strip_end"])
     raw = footprint.buffer(-P["rim"], join_style="mitre").union(strip.buffer(P["rim"] + 1, cap_style="flat"))
-    panel = rnd(P["pocket_r"], raw).intersection(footprint)
+    full_panel = rnd(P["pocket_r"], raw).intersection(footprint)  # (the M6 panel: front feet keep their places on it)
+    # M7: the rear pentagon. Its front corners (and V tip) rounded panel_front_r: the rabbet's inner corners, from below
+    # M7 (user): all four feet press into the body. The rear pair sits at the M6 back-corner screw spots; the panel's
+    # sides come in to rear_foot_clear inboard of them and run straight to the back edge (no wings to the corners):
+    # the rear band narrows with it, body fills the back corners beside it
+    fl_, fw_ = P["feet"]
+    old_path = full_panel.buffer(-P["ledge"] / 2).exterior  # the M6 corner screw spots: the feet stay near them
+    foot_at = lambda a, t: LineString([a, a + t * (fl_ - fw_)]).buffer(fw_ / 2, quad_segs=16)
+    rear_feet_at = []
+    for i in (0, 2):
+        t = np.subtract(foot_pts[1], foot_pts[i]); t = t / np.linalg.norm(t)
+        rear_feet_at.append((np.array(old_path.interpolate(old_path.project(Point(foot_pts[i]))).coords[0]), t))
+    xl = foot_at(*rear_feet_at[0]).bounds[2] + P["rear_foot_clear"] + P["panel_gap_print"]
+    xr = foot_at(*rear_feet_at[1]).bounds[0] - P["rear_foot_clear"] - P["panel_gap_print"]
+    r_ = P["panel_front_r"]
+    raw0 = raw
+    floor_at = lambda x, y: z_at(Ms["left" if x < ridge else "right"], FLOOR_W, x, y)
+    # M7 (user, panel_t 4): the V moves back from panel_shift in 0.5 mm steps until the body over the panel keeps
+    # base_min of floor over the rabbet ceiling (panel_t + base_min above the desk) everywhere over it
+    for shift in np.arange(P["panel_shift"], P["panel_shift"] + 40, 0.5):
+        cut_ = raw0.intersection(affinity.translate(footprint, 0, shift)).intersection(box(xl, -1e3, xr, 1e3))
+        # its front corners R6 (the back ones stay square: they run out through the rear face)
+        y_c = max(foot_pts[3][1], foot_pts[-1][1]) + shift
+        raw = cut_.intersection(box(-1e3, -1e3, 1e3, y_c + 15)).buffer(-r_, quad_segs=16).buffer(r_, quad_segs=16).union(
+            cut_.intersection(box(-1e3, y_c + 10, 1e3, 1e3)))
+        panel = rnd(P["pocket_r"], raw).intersection(footprint)
+        ov_ = opening.intersection(panel.buffer(P["panel_gap_print"]))
+        if min(floor_at(x, y) for q in getattr(ov_, "geoms", [ov_]) for x, y in q.exterior.coords) >= \
+                P["panel_t"] + P["base_min"] - 1e-6:
+            break
+    panel_shift = float(shift)
     # Fusion: the strip and its rabbet run 1 mm past the footprint and are trimmed by the rear lean planes, so the
     # strip's rear face continues the lower band (no knife-edge of body behind it)
     panel_lean = rnd(P["pocket_r"], raw).intersection(footprint.buffer(1.0, join_style="mitre"))
@@ -501,7 +566,6 @@ def _build(lay):
     z_rx = z_top - P["udb_t"] - rh / 2
     udb_c = (ridge, foot_pts[1][1] + z_rx * math.tan(phi) - P["usb_recess"] - bd / 2)
     udb_board = box(udb_c[0] - bw / 2, udb_c[1] - bd / 2, udb_c[0] + bw / 2, udb_c[1] + bd / 2)
-    udb_keep = udb_board.buffer(0.5 + P["screw_head"] / 2, join_style="mitre")  # bay (UDB + 0.5) plus the head
     hx, hy = P["udb_holes"][0] / 2, P["udb_holes"][1] / 2
     # flipped about its own Y axis: local z = 0 (the back face) at z_top, the components toward -z
     udb = {"matrix": [[-1, 0, 0, udb_c[0]], [0, 1, 0, udb_c[1]], [0, 0, -1, z_top], [0, 0, 0, 1]],
@@ -513,17 +577,16 @@ def _build(lay):
            "mounts": [[udb_c[0] + x, udb_c[1] - hy] for x in (-hx, hx)],
            "mount_z": [z_top, z_top + P["udb_mount"][1]]}
 
-    # screws, on the ledge's centre line: the 4 panel corners (under the feet), the front V point, and the middle
-    # of the back moved along the line just far enough to clear the UDB bay
-    path = panel.buffer(-P["ledge"] / 2).exterior
-    at = lambda i: path.project(Point(foot_pts[i]))
-    screws = [path.interpolate(at(i)) for i in (0, 2, 3, len(foot_pts) - 1, ring.index(v))]  # bl, br, fr, fl, V
-    for d in np.arange(0, 60, 0.05):
-        q = [q for sg in (-1, 1) if not udb_keep.intersects(q := path.interpolate((at(1) + sg * d) % path.length))]
-        if q:
-            screws.append(q[0])
-            udb["back_screw_shift"] = round(q[0].x - ridge, 3)
-            break
+    # screws (M7, user: 4, in the recessed field at its 4 outer corners, just inside the border; no V-tip screw).
+    # Their line runs panel_recess[1] + the head radius + screw_recess_margin in from the panel edge: the back pair
+    # here; the side-front pair after the relief grooves (below)
+    path = panel.buffer(-(P["panel_recess"][1] + P["screw_head"] / 2 + P["screw_recess_margin"]), join_style="mitre").exterior
+    ptsp = [path.interpolate(t) for t in np.linspace(0, path.length, 6000)]
+    y_back = max(foot_pts[0][1], foot_pts[2][1])
+    backs = [min(ptsp, key=lambda q: math.hypot(q.x - x_, q.y - y_back)) for x_ in (xl, xr)]
+    screws = backs  # bl, br (+ front-left, front-right below)
+    insert_depths = [P["insert_hole_short"][1]] * 3
+    front_feet_at = [old_path.interpolate(old_path.project(Point(foot_pts[i]))) for i in (3, len(foot_pts) - 1)]
 
     # M4 rear lip: the panel strip rises up the rear face (z panel_t .. USB centre) as a visible band, the body cut
     # back to match (lip + print gap). It ends lip_end from the corners. M5 DFM: the body's lip pocket (cut from below)
@@ -533,16 +596,40 @@ def _build(lay):
     lip_top = P["panel_t"] + P["usb_opening"][1] / 2
     lip_line = ops.substring(back, lip_end, back.length - lip_end)
     band = lip_line.buffer(10, cap_style="flat")
-    band_x = ops.substring(back, lip_end - 4, back.length - lip_end + 4).buffer(10, cap_style="flat")
+    # M7 (user): each band end is one long diagonal from the top edge's end down to the panel's outer top corner at
+    # the side rim (no flat run-out, no concave corner), so the lip and its pocket run out to the panel's ends
+    band_x = ops.substring(back, P["rear_strip_end"] - 4, back.length - P["rear_strip_end"] + 4).buffer(10, cap_style="flat")
     raw_pocket = band_x.intersection(footprint.buffer(4.0, join_style="mitre")).difference(
         footprint.buffer(-lip_d - P["panel_gap_print"], join_style="mitre"))
     lip_pocket = raw_pocket.buffer(-P["pocket_r"], quad_segs=16).buffer(P["pocket_r"], quad_segs=16).simplify(0.002)
+    # M7: its ends stop at the rabbet's side walls (the panel's ends + the gap); behind the rear face it is air
+    pe = sorted(p_.x for p_ in back.intersection(panel_lean.boundary).geoms)
+    g_ = P["panel_gap_print"]
+    lip_pocket = lip_pocket.intersection(rabbet_lean.buffer(-0.01).union(box(pe[0] - g_ + 0.02, 0, pe[-1] + g_ - 0.02, 1e3).difference(footprint)))
     # lip and pocket run 4 mm past each end in plan (their R3 / R2.8 corners out of the way): the band's end is the
     # diagonal alone (a plan end at the seam point left a 0.2 mm notch in the end line). The pocket starts at the
     # seam (z panel_t), so below it the rabbet alone is the void.
     lip = band_x.intersection(footprint.buffer(4.0, join_style="mitre")).difference(
         footprint.buffer(-lip_d, join_style="mitre")).buffer(-P["pocket_r"] + P["panel_gap_print"], quad_segs=16).buffer(
-        P["pocket_r"] - P["panel_gap_print"], quad_segs=16).intersection(footprint.buffer(1.0, join_style="mitre"))
+        P["pocket_r"] - P["panel_gap_print"], quad_segs=16).intersection(panel_lean)
+    # the diagonals in the rear view (x): foot at the panel's outer corner on the back line, top vertex where the M5
+    # band's was (strip_lip[2] in from lip_end), so the top edge and its R6 corner stay put
+    band_ends = [pe[0], pe[-1]]
+    band_run = [P["band_end_run"]] * 2  # M7: the v6 diagonal (3.6 over 21.2, ~9.6 deg) from the narrowed panel's corners
+    # M7 rear-face recess, in (x, z): the face is the panel's edge (z 0 .. panel_t) plus the band with its diagonal
+    # ends, less the border; less a frame round the USB notch; split at the ridge (two lean planes)
+    bb_, br_ = P["band_recess"]
+    x0_, x1_ = band_ends
+    z1_ = P["panel_t"]; z2_ = z1_ + P["usb_opening"][1] / 2
+    # M8 (user): the face runs down past the panel's back edge, so its field has no border there: it wraps onto the
+    # bottom recess (clipped at z -1, the cutters' floor)
+    face_ = Polygon([(x0_, -5), (x1_, -5), (x1_, z1_), (x1_ - band_run[1], z2_), (x0_ + band_run[0], z2_), (x0_, z1_)])
+    fld_ = face_.buffer(-bb_, join_style="mitre").buffer(-br_, quad_segs=16).buffer(br_, quad_segs=16).intersection(
+        box(-1e3, -1, 1e3, 1e3))
+    sw_ = max(P["usb_slot_w"], 0) / 2
+    frame_ = box(ridge - sw_, z1_, ridge + sw_, z2_ + 5).buffer(bb_, quad_segs=16)
+    fld_ = fld_.difference(frame_)
+    band_recess = {"left": fld_.intersection(box(-1e3, -1, ridge, 50)), "right": fld_.intersection(box(ridge, -1, 1e3, 50))}
     # M5 band ends, one diagonal from the band top to the desk (Fusion's lip_ramps): it trims the panel's rear run-out
     # inside rear_zone_panel and the body's rabbet / lip pocket inside rear_zone_body, which starts gap further out
     # (the hidden step where the trimmed run-out meets the full panel keeps its gap; the corner rabbet is untouched)
@@ -557,17 +644,6 @@ def _build(lay):
         while lip_pocket.distance(screws[i]) < 5.0 + ir:
             dy += 0.05
             screws[i] = path.interpolate(path.project(Point(q0.x, q0.y - dy)))  # (straight forward, kept on the ledge line)
-    # the back screw's insert would sit 2.5 mm from the lip pocket: move it straight in (-y) until 5 mm clear, and
-    # leave a boss for it in the cavity (5 mm round the hole, cavity corners stay cavity_r)
-    ir = P["insert_hole"][0] / 2
-    q = screws[5]
-    dy = 0.0
-    while lip_pocket.distance(Point(q.x, q.y - dy)) < 5.0 + ir:
-        dy += 0.01
-    screws[5] = Point(q.x, q.y - dy)
-    udb["back_screw_inward"] = round(dy, 2)
-    cavity = cavity.difference(screws[5].buffer(ir + 5.05))  # +0.05: the buffered circle is a polygon
-    cavity = cavity.buffer(-P["cavity_r"]).buffer(P["cavity_r"])
 
     # §6.9 UDB bay (UDB + 0.5, corners rounded to pocket_r), cut from below to the standoff tops, its back edge 5 mm inside
     # the (M4, leaning) rear face at the slot top. Behind it the slot: bay-wide, open to the bottom, through the rear
@@ -591,16 +667,28 @@ def _build(lay):
     udb["pad"] = {"x": [ridge - (sw - P["usb_r"][0]), ridge + (sw - P["usb_r"][0])],
                   "y": [wall_y + 0.3, udb_c[1] + bd / 2 - 0.25], "z": [z_top, P["panel_t"] + uh + 0.05]}
 
-    # feet (28 x 8 stadium bars, round ends = the pocket's tool radius): along the adjacent front/back edge, the
-    # outer end's centre on the corner screw, so the bar covers the head (radius 3.36 < 4) and stays on the panel
+    # feet (28 x 6 stadium bars, round ends = the pocket's tool radius): along the adjacent front/back edge from the
+    # M6 corner screw spots (the rear pair moved forward clear of the back strip). M7: all four in the body
     fl_, fw_ = P["feet"]
     feet, feet_pegs = [], []
-    for i, (q, toward) in enumerate(zip(screws[:4], (foot_pts[1], foot_pts[1], v, v))):  # bl, br, fr, fl
+    for i, (q, toward) in enumerate(zip([Point(a) for a, _ in rear_feet_at] + front_feet_at, (foot_pts[1], foot_pts[1], v, v))):  # bl, br, fr, fl
         t = np.subtract(toward, foot_pts[(0, 2, 3, len(foot_pts) - 1)[i]])
         t = t / np.linalg.norm(t)
         a = np.array([q.x, q.y])
         feet.append(LineString([a, a + t * (fl_ - fw_)]).buffer(fw_ / 2, quad_segs=16))
         feet_pegs.extend(Point(*(a + t * u_)) for u_ in (P["foot_peg"][2], fl_ - fw_))
+
+    # M7 panel recess (underside field), clear of the screw heads by panel_recess[3]
+    rd_, rb_, rr_, rc_ = P["panel_recess"]
+    # (each pad joined to the border by the shortest way: rounded tabs, no islands in the field)
+    # M8 (user): no border along the back edge, so the field runs out through it onto the band. The back chain
+    # (within 2 mm of the top: the two corners and the shallow ridge kink) is lifted 30 mm before the inset, so the
+    # side borders stay straight and the back border is pushed clear; the field is then clipped to the panel
+    qc_ = list(panel.exterior.coords)[:-1]
+    ext_ = [(x_, y_ + 30.0) if y_ > panel.bounds[3] - 2.0 else (x_, y_) for x_, y_ in qc_]
+    panel_recess = Polygon(ext_).buffer(-rb_, join_style="mitre").buffer(-rr_, quad_segs=16).buffer(rr_, quad_segs=16)
+    panel_recess = panel_recess.intersection(panel.buffer(0.5, join_style="mitre"))
+    panel_recess = max(getattr(panel_recess, "geoms", [panel_recess]), key=lambda q: q.area)
 
     # wall thickness in plan (M4's lower band leans in, so the desk-level footprint is the outer face at z = 0)
     rab = rabbet["print"]
@@ -700,6 +788,9 @@ def _build(lay):
     def floor_under(h, poly):  # the highest floor-plane point under poly
         return max(floor_z(h, x, y) for x, y in poly.exterior.coords)
     islands = []
+    sock_low = {h: unary_union([affinity.affine_transform(k, [Ms[h][0, 0], Ms[h][0, 1], Ms[h][1, 0], Ms[h][1, 1],
+                                                              Ms[h][0, 2] * w_ + Ms[h][0, 3], Ms[h][1, 2] * w_ + Ms[h][1, 3]])
+                                for k in d["sockets"] for w_ in (wb, wb - P["socket_h"])]).buffer(0.1) for h, d in halves.items()}
     for h, d in halves.items():  # a pillar under each PCBsnap
         M, o_ = Ms[h], opens_h[h]
         A = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * wb + M[0, 3], M[1, 2] * wb + M[1, 3]]
@@ -712,6 +803,11 @@ def _build(lay):
             L_, D_ = P["pillar"][0] / 2, q["post_depth"]  # (from the wall; shorter where the legs are trimmed)
             a0, a1 = -(P["snap_gap"] - P["snap_spine"] + 1.5), D_ - (P["snap_gap"] - P["snap_spine"])  # from the outer face: 1.5 into the wall, D_ in from the wall
             rect = Polygon([m - t * L_ + n_in * a0, m + t * L_ + n_in * a0, m + t * L_ + n_in * a1, m - t * L_ + n_in * a1])
+            # M7: the post is a vertical prism, the sockets hang along the tilted normal: their bottoms reach further
+            # in plan than in the PCB frame, so the post's inner face steps back until 0.1 mm clear of them
+            while rect.intersects(sock_low[h]):
+                a1 -= 0.05
+                rect = Polygon([m - t * L_ + n_in * a0, m + t * L_ + n_in * a0, m + t * L_ + n_in * a1, m - t * L_ + n_in * a1])
             rect = rect.buffer(-P["pillar_r"]).buffer(P["pillar_r"])
             isl = dedup(merge(rect.intersection(o_), o_, P["pillar_fillet"]))
             # its top is the half's PCB-underside plane moved down pillar[2] (parallel to the PCB); Fusion trims the
@@ -723,8 +819,8 @@ def _build(lay):
             islands.append({"poly": isl, "z": [z_base - 1.0, max(zs) + 0.5], "kind": f"pillar {h} {q['side']}", "half": h, "fillet": P["pillar_fillet"],
                             "w_top": wb - P["pillar"][2], "z_low": min(zs), "z_high": max(zs), "z_floor": floor_under(h, isl),
                             "probes": [list(f(ec, key=k_)) for f in (min, max) for k_ in (lambda p: p[0] + p[1], lambda p: p[0] - p[1])]})
-    bosses = [(f"insert boss {i + 1}", q.x, q.y, P["insert_hole"][0] / 2,
-               P["panel_t"] + (P["insert_hole_short"][1] if i < 2 else P["insert_hole"][1])) for i, q in enumerate(screws)]
+    bosses = [(f"insert boss {i + 1}", q.x, q.y, P["insert_hole"][0] / 2, P["panel_t"] + insert_depths[i])
+              for i, q in enumerate(screws)]
     bosses += [(f"UDB insert boss {i + 1}", x, y, P["udb_insert"][0] / 2, udb["mount_z"][0] + P["udb_insert"][1])
                for i, (x, y) in enumerate(udb["mounts"])]
     for kind, x, y, ri, itop in bosses:  # >= 5 mm of material over each insert under a pocket (5.2: measured)
@@ -733,6 +829,14 @@ def _build(lay):
             if o_.distance(Point(x, y)) < ri + 5:
                 isl = merge(Point(x, y).buffer(ri + 5).intersection(o_), o_)
                 low_ = o_.difference(zp_above(Ms[h], top + 0.3 - fw + wb))  # where the floor plane is below its top (+0.3)
+                if not kind.startswith("UDB"):
+                    # M7: 5 mm of material in 3D from the insert hole: d mm out from its edge the floor needs only
+                    # sqrt(25 - d^2) over the insert top (5 straight up, nothing at 5 to the side)
+                    c_ = Point(x, y)
+                    low_ = unary_union([c_.buffer(ri + d_ + 0.5).difference(c_.buffer(ri + d_)).intersection(
+                        o_.difference(zp_above(Ms[h], itop + math.sqrt(25 - d_ * d_) + 0.2 - fw + wb)))
+                        for d_ in np.arange(0, 5, 0.5)] + [c_.buffer(ri).intersection(
+                        o_.difference(zp_above(Ms[h], itop + 5.2 - fw + wb)))])
                 eff = isl.intersection(low_.buffer(0.5)) if not low_.is_empty else Polygon()
                 if kind.startswith("UDB") and not eff.is_empty:
                     # M6 (undercut check): a UDB boss clipped where the floor rises past its top left zero-area slivers
@@ -799,13 +903,38 @@ def _build(lay):
             c_ = big.exterior.interpolate(big.exterior.project(c0))
             grooves.append(Point(c_.x, c_.y).buffer(gw * 0.75))
         gro = affinity.affine_transform(unary_union(grooves), A).intersection(o_.buffer(-P["groove_wall"]))
-        rule_ok = zp_above(M, P["panel_t"] + P["floor_above_panel"] + gd - fw + wb)
+        # M7: >= base_min_groove of body under a groove: over the desk in front, over the rabbet ceiling over the panel
+        pz_ = rabbet["print"]
+        rule_ok = zp_above(M, P["base_min_groove"] + gd - fw + wb).difference(pz_).union(
+            zp_above(M, P["panel_t"] + P["base_min_groove"] + gd - fw + wb).intersection(pz_))
         keep_out = unary_union([q["poly"].buffer(P["island_clear"]) for q in islands if q["half"] == h] +
                                [unary_union(stubs).buffer(P["island_clear"])])
         gro = opn3(gro.intersection(rule_ok).difference(keep_out))
         gro = unary_union([q for q in getattr(gro, "geoms", [gro]) if q.area > 20])
         gro = shapely.remove_repeated_points(gro, 0.02).buffer(0)  # (M6: drops the 0.01 mm jogs the booleans leave: sliver faces)
         floor[h].update({"grooves": dedup(gro), "groove_w": [fw - gd, fw]})  # off the walls: no shared faces
+    # M7 side-front panel screws: from the recessed field's side-front corner, the nearest spot (0.5 mm grid, within
+    # 30 mm) where the body over the insert keeps >= 5 mm in 3D (sqrt(25 - d^2) over the insert top at d mm out from its
+    # edge, + 0.2), counting any relief groove over it: so no boss is needed and the grooves stay whole
+    itop_ = P["panel_t"] + P["insert_hole_short"][1]
+    gro_ = unary_union([floor[h]["grooves"] for h in floor])
+    def body_top(x, y):
+        return floor_at(x, y) - (P["relief"][1] if gro_.contains(Point(x, y)) else 0.0)
+    def insert_ok(x, y):
+        return all(body_top(x + (2 + d_) * math.cos(a), y + (2 + d_) * math.sin(a)) >= itop_ + math.sqrt(25 - d_ * d_) + 0.2
+                   for d_ in (0.0, 1.0, 2.0, 3.0, 4.0) for a in np.linspace(0, 2 * math.pi, 13)) and \
+            all(body_top(x + r_ * math.cos(a), y + r_ * math.sin(a)) >= itop_ + 5.2 for r_ in (0.0, 1.0)
+                for a in np.linspace(0, 2 * math.pi, 9))
+    fld = panel_recess.buffer(-(P["screw_head"] / 2 + 0.5))
+    # M8 (user): the two front screws are replaced by one at the panel's V point (on the ridge, just inside the border):
+    # the nearest spot to the V where the field and the 3D insert rule both hold
+    apex = min(ptsp, key=lambda q: q.y + 3 * abs(q.x - ridge))
+    grid = [Point(apex.x + dx, apex.y + dy) for dx in np.arange(-10, 10.01, 0.25) for dy in np.arange(0, 30.01, 0.25)]
+    v_ = min((q for q in grid if fld.contains(q) and insert_ok(q.x, q.y)), key=lambda q: q.distance(apex))
+    fronts, screw_front_offset = [v_], [round(v_.distance(apex), 1)]
+    screws = backs + fronts
+    # M7: the cavity is no longer one void: the insert wall that matters is to the voids cut from below (channels, bay)
+    walls["insert_to_cavity"] = min(unary_union([chan, bay]).distance(q) for q in screws) - P["insert_hole"][0] / 2
     cavity_steps = {"channels": channels, "chan": chan, "chan_z": [-1.0, P["panel_t"] + P["chan_h"]],
                     "stubs": unary_union(stubs), "floor": floor, "islands": islands}
 
@@ -813,19 +942,19 @@ def _build(lay):
     return {
         "params": P, "layers": layers, "udb": udb, "socket_box": SOCKET, "floor_w": FLOOR_W, "pcb_mid_w": PCB_MID_W,
         "ridge_x": ridge, "y_front": y_front, "lift": lift, "h_front": min(heights["front_left"], heights["front_right"]),
-        "max_height": max(heights.values()), "heights": heights, "floor_min_z": low + lift, "web_min": web_min, "web_sym": web_sym,
+        "max_height": max(heights.values()), "heights": heights, "floor_min_z": low + lift, "cap_gap": cap_gap, "web_min": web_min, "web_sym": web_sym,
         "outline_size": [maxx - minx, maxy - miny],
         "key_gap": key_gap, "v_offset": sharp[3][0] - ridge, "v_offset_equal_bezels": v_off0, "front_bezels": front_bezels,
         "_shapes": {"envelopes": env, "opening": opening, "outline": outline, "outline_sharp": outline_sharp,
                     "footprint": footprint, "panel": panel, "rabbet": rabbet, "cavity": cavity},
-        "screws": [[round(p.x, 4), round(p.y, 4)] for p in screws],
+        "screws": [[round(p.x, 4), round(p.y, 4)] for p in screws], "insert_depths": insert_depths, "screw_front_offset": screw_front_offset, "panel_recess": panel_recess, "panel_shift": panel_shift, "band_recess": band_recess,
         "cavity_steps": cavity_steps, "bay": bay, "bay_z": [-1.0, z_top + P["udb_mount"][1]], "notch": notch, "notch_z": [-1.0, P["panel_t"] + uh],
         "usb_centre": [ridge, usb_centre_z], "feet": feet, "feet_plug": [f.buffer(P["foot_fit"], quad_segs=16) for f in feet],
         "peg_holes": [q.buffer(P["foot_peg"][0] / 2, quad_segs=16) for q in feet_pegs],
         "pegs": [q.buffer(P["foot_peg"][0] / 2 + P["foot_fit"], quad_segs=16) for q in feet_pegs], "walls": walls, "lower_band": lower_band,
         "panel_lean": panel_lean, "rabbet_lean": rabbet_lean, "lip": lip, "lip_pocket": lip_pocket,
         "rear_zone_panel": rear_zone["panel"], "rear_zone_body": rear_zone["body"],
-        "lip_z": [P["panel_t"], lip_top], "lip_ends": [lip_line.coords[0][0], lip_line.coords[-1][0]], "lip_pocket_z": [P["panel_t"] - 0.01, lip_top + P["panel_gap_print"]],
+        "lip_z": [P["panel_t"], lip_top], "lip_ends": band_ends, "lip_run": band_run, "lip_pocket_z": [P["panel_t"] - 0.01, lip_top + P["panel_gap_print"]],
         # M4: the opening chamfer's top edge on the facets (Fusion cuts it with a 45 deg tapered extrude: its
         # chamfer feature fails on the faceted opening)
         "chamfer_top": opening.buffer(P["opening_chamfer"]).simplify(0.002).buffer(0.002, join_style="mitre"),
@@ -871,8 +1000,7 @@ if __name__ == "__main__":
     print(f"halves spread {P['half_spread']} mm; ridge at mid key gap {g['key_gap'][0]:.2f} .. {g['key_gap'][1]:.2f}; "
           f"outline centre {g['outline_offset']:+.2f} mm off it; side bezels {P['bezel_side']} each; "
           f"V front point {g['v_offset']:+.2f} mm off the ridge")
-    print(f"outline {g['outline_size'][0]:.2f} x {g['outline_size'][1]:.2f} mm, {len(g['screws'])} screws, back one "
-          f"{g['udb']['back_screw_shift']:+.2f} mm off the ridge -> {out}")
+    print(f"outline {g['outline_size'][0]:.2f} x {g['outline_size'][1]:.2f} mm, {len(g['screws'])} screws -> {out}")
     fl = g["cavity_steps"]["floor"]
     print("pocket floor: plane parallel to each PCB, " + "; ".join(f"{h} z {min(G_ := [z_at(np.array(g['halves'][h]['matrix']), f['w'], x, y) for x, y in f['open'].exterior.coords]):.2f}..{max(G_):.2f}, grooves {f['grooves'].area:.0f} mm2 at -{P['relief'][1]}" for h, f in fl.items()))
     print("islands: " + ", ".join(f"{q['kind']} top z " + (f"{q['z_low']:.2f}..{q['z_high']:.2f}" if 'w_top' in q else f"{q['z'][1]:.2f}")
