@@ -427,14 +427,36 @@ def layout_shot():
 
 
 # ---------------------------------------------------------------- step 6: M9 prototype meshes
-def proto():
+# Dummy PCB holes: MX hotswap footprint + Cherry PCB-mount stab (KiCad SW_Cherry_MX_2.00u_PCB, Kailh hotswap),
+# key-local mm, +y = back. (nominal Ø, x, y); printed Ø = nominal + print_hole_clearance.
+print_hole_clearance = 0.3
+MX_HOLES = [(4.0, 0, 0), (1.75, -5.08, 0), (1.75, 5.08, 0), (3.0, -3.81, 2.54), (3.0, 2.54, 5.08)]
+STAB_HOLES = [(3.9878, 11.938, -8.2423), (3.0480, 11.938, 6.985)]  # large (front) and wire (back); also at -x
+
+
+def pcb_holes(k):
+    """Hole outlines (plan polygons, PCB frame) for one key: switch holes, plus stab holes for keys >= 2u."""
+    hs = list(MX_HOLES)
+    if k["w"] >= P["stab"]["min_w"]:
+        hs += [(d, sx * x, y) for d, x, y in STAB_HOLES for sx in (-1, 1)]
+    a = math.radians(k["ang"])
+    c, s = math.cos(a), math.sin(a)
+    out = []
+    for d, x, y in hs:
+        cx, cy = k["x"] + x * c - y * s, k["y"] + x * s + y * c
+        r = (d + print_hole_clearance) / 2
+        out.append([[cx + r * math.cos(t * math.pi / 24), cy + r * math.sin(t * math.pi / 24)] for t in range(48)])
+    return out
+
+
+def dummy_pcbs():
     os.makedirs(PROTO, exist_ok=True)
     Lz = g["layers"]
     for h in ("left", "right"):
         d = g["halves"][h]
         s = "L" if h == "left" else "R"
         # dummy PCB, printed top face down: turned 180° about X, so v -> -v and w -> -w (not a mirror).
-        # PCB w -6.6..-5.0 -> z 0..1.6 (z = -5.0 - w); socket keep-outs and the JST hang below it -> bumps up
+        # PCB w -6.6..-5.0 -> z 0..1.6 (z = -5.0 - w); the JST hangs below it -> bump up
         flip = lambda polys: [[[x, -y] for x, y in p] for p in polys]
         zr = lambda w: [-5.0 - w[1], -5.0 - w[0]]
         c = put("DummyPcb" + s, [], hidden=True)
@@ -448,8 +470,8 @@ def proto():
                 cx, cy = p[0] + u[0] * sg * 1.6, p[1] + u[1] * sg * 1.6
                 marks.append([[cx + 0.6 * math.cos(t * math.pi / 8), cy + 0.6 * math.sin(t * math.pi / 8)]
                               for t in range(16)])
-        slab(c, "Board", flip([d["pcb"]] + marks), zr(Lz["pcb"]), True)
-        slab(c, "Sockets", flip(d["sockets"]), zr(Lz["socket"]))
+        holes = [p for k in d["keys"] for p in pcb_holes(k)]
+        slab(c, "Board", flip([d["pcb"]] + marks + holes), zr(Lz["pcb"]), True)
         slab(c, "JST", flip([d["jst"]]), zr(Lz["jst"]))
         bs = [cp(b) for b in c.bRepBodies]
         board = bs[0]
@@ -458,6 +480,13 @@ def proto():
         b = put("DummyPcbPrint" + s, [to_origin(board)], hidden=True).bRepBodies.item(0)
         info(f"dummy_pcb_{h}", b)
         mesh(b, os.path.join(PROTO, f"dummy_pcb_{h}.stl"))
+
+
+def proto():
+    dummy_pcbs()
+    os.makedirs(PROTO, exist_ok=True)
+    for h in ("left", "right"):
+        s = "L" if h == "left" else "R"
         pb = body("PrintPlate" + s)
         mesh(pb, os.path.join(PROTO, f"plate_{h}.stl"))
     # 4 TPU feet (pad down, pegs up, as in the model) in a row
