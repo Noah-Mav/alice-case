@@ -1,0 +1,3 @@
+[submodule "layout"]
+	path = layout
+	url = https://github.com/Noah-Mav/alice-layout-designer.git
