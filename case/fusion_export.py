@@ -449,6 +449,26 @@ def pcb_holes(k):
     return out
 
 
+# Kailh CPG151101S11 hotswap socket body, key-local (+y = back): two offset lobes round the switch pin holes,
+# one S-shaped outline. ponytail: 10.9 x 4.6 mm from the datasheet outline as briefed (not fetched), pads left out.
+SOCKET_OUTLINE = [(-6.085, 1.51), (-0.2, 1.51), (-0.2, 3.4), (4.815, 3.4), (4.815, 6.11), (-1.0, 6.11), (-1.0, 4.2), (-6.085, 4.2)]
+SOCKET_PIN_D = 1.9  # Ø1.6 pin slot printed +0.3 (flat blades 1.5 x 0.4)
+
+
+def socket_polys(k):
+    """(lobes, cutters) plan polygons for one key: socket bodies; pin slots + centre post and peg holes through them."""
+    a = math.radians(k["ang"])
+    c, s = math.cos(a), math.sin(a)
+    tf = lambda x, y: [k["x"] + x * c - y * s, k["y"] + x * s + y * c]
+    lobes = [[tf(x, y) for x, y in SOCKET_OUTLINE]]
+    cut = []
+    for d, x, y in [(SOCKET_PIN_D - print_hole_clearance, -3.81, 2.54), (SOCKET_PIN_D - print_hole_clearance, 2.54, 5.08)] + MX_HOLES[:3]:
+        r = (d + print_hole_clearance) / 2
+        cx, cy = tf(x, y)
+        cut.append([[cx + r * math.cos(t * math.pi / 24), cy + r * math.sin(t * math.pi / 24)] for t in range(48)])
+    return lobes, cut
+
+
 def dummy_pcbs():
     os.makedirs(PROTO, exist_ok=True)
     Lz = g["layers"]
@@ -473,10 +493,21 @@ def dummy_pcbs():
         holes = [p for k in d["keys"] for p in pcb_holes(k)]
         slab(c, "Board", flip([d["pcb"]] + marks + holes), zr(Lz["pcb"]), True)
         slab(c, "JST", flip([d["jst"]]), zr(Lz["jst"]))
+        sk = [socket_polys(k) for k in d["keys"]]
+        slab(c, "Sockets", flip([q for l, _ in sk for q in l]), zr(Lz["socket"]))
+        slab(c, "SocketCut", flip([q for _, cu in sk for q in cu]), [zr(Lz["socket"])[0] - 0.1, zr(Lz["socket"])[1] + 0.1])
         bs = [cp(b) for b in c.bRepBodies]
         board = bs[0]
-        for b in bs[1:]:
-            op(board, b, "Union")
+        ns = len(sk)
+        socks, cuts = bs[2:2 + ns], bs[2 + ns:]
+        for sb in socks:  # cut each socket by the slots/holes inside its own footprint, then join (cheap small booleans)
+            b0 = bbox(sb)
+            for t in cuts:
+                b1 = bbox(t)
+                if b1[0] < b0[3] and b1[3] > b0[0] and b1[1] < b0[4] and b1[4] > b0[1]:
+                    op(sb, cp(t), "Difference")
+            op(board, sb, "Union")
+        op(board, bs[1], "Union")
         b = put("DummyPcbPrint" + s, [to_origin(board)], hidden=True).bRepBodies.item(0)
         info(f"dummy_pcb_{h}", b)
         mesh(b, os.path.join(PROTO, f"dummy_pcb_{h}.stl"))
