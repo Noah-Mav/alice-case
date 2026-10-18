@@ -2,9 +2,9 @@ Case for a split 40% Alice keyboard, designed with [alice-layout-designer](https
 
 ![Alice case in walnut with Cherry-profile keycaps](docs/images/hero_iso.png)
 
-| Top | Back | Centre ridge |
-|---|---|---|
-| ![Top view](docs/images/top.png) | ![Back view with USB-C](docs/images/back.png) | ![Close-up of the centre ridge](docs/images/closeup_ridge.png) |
+| Top | Back | Underside | Low |
+|---|---|---|---|
+| ![Top view](docs/images/top.png) | ![Back view with USB-C](docs/images/back.png) | ![Underside](docs/images/underside.png) | ![Low three-quarter view](docs/images/low.png) |
 
 Renders from Fusion (walnut body, anodised panel, Cherry-profile caps). Electronics are placeholders.
 
