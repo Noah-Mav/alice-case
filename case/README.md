@@ -43,6 +43,7 @@ The case is built in two stages. **Python does the maths** (`geometry.py` writes
 - **USB opening:** the stepped slot (22 wide chamber, 17 wide neck 2 mm deep at the rear face, 7.2 high) lines up with the board's USB receptacle.
 - **Walls (thinnest wall >= 5 mm):** no wall is thinner than 5 mm anywhere, as wood needs.
 - **Bezel top over the plate top (lip):** the case top is exactly 2.0 mm above each half's plate top everywhere.
+- **Printed clip variants:** the halves hold the exact printed FRONT (x4) / BACK (x6) bodies at their spots (same volume as `TpuClipFront` / `TpuClipBack`); none touches the Body, and each meets its PCB only in the lip's 0.1 grip (<= 1.6 mm3; measured 0.89).
 - **C-clip recess fit:** each of the 10 clip bodies sits in its recess (no interference with the Body, bottom on the recess floor) with >= 3.5 mm of Body under it (floor plane >= 4.0 above the desk).
 - **Rear peak cut:** the top over the cut triangle is the one plane through A and the BC line; A and BC are where the JSON says; >= 5 mm of body over the UDB bay; ~22 mm of rear face over the USB slot.
 - **Floor over the cable channels / M3 inserts:** enough material (3 mm / 5 mm) is left over the cable channels and above each screw insert.

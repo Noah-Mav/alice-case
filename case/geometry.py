@@ -118,8 +118,10 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # v2 (user): the PCBsnaps, their pillars and the pillar fillets are gone. The PCB is held by 10 printable TPU C-clips
     # (5 per half) on its edge: each 10 long, a slot of 1.5 for the 1.6 PCB (it grips), 2.5 of ledge under the PCB, a 1.0
     # lip 1.5 over the PCB top (30 deg lead-in), the spine filling the PCB-to-wall gap, a hex lattice below. Each clip
-    # sits in a recess in the pocket floor: recess = [length, width, depth], width measured in from the pocket wall
-    # (so it reaches 3.8 - wall gap under the PCB), R1.5 corners (Ø3 tool), its wall side on the wall (no undercut),
+    # sits in a recess in the pocket floor: recess = [length, width, depth], its inner side snap_gap - width = 2.9 in from the PCB
+    # edge (a fixed line, so the ledge's 2.5 + 0.4 always fits), running out to the pocket wall, which it is cut to: the width at the
+    # floor is therefore 2.9 + the wall gap (3.2 at the back edge .. 4.7 at the front, the wall being vertical and the PCB tilted; the
+    # nominal 3.8 only where the gap is 0.9). R1.5 corners (Ø3 tool), its wall side on the wall (no undercut),
     # and a 45 deg lead-in chamfer (the depth wide) on its three open sides. The floor plane under a recess must be
     # >= clip_floor_min above the desk (local exception to base_min: 4.0 - 0.5 = 3.5 left under it).
     # clip_pts: the PCB-local edge points (v1 PCB frame, as the spots were chosen); geometry.py snaps them to the frozen edge
@@ -130,7 +132,16 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
              # lead-in only widens it), trimmed by the profile's ledge (2.5 under the PCB, 0.4 in from the recess side) and the
              # spine (wall_air 0.1 off the wall). v2 first run: the square clip corners stood 0.2 into the R1.5 ones, 10 slivers
              # of 0.006 .. 0.03 mm3 in the Fusion interference check. The test asserts the clearance >= `min_fit`
-             "fit": 0.2, "min_fit": 0.15},
+             "fit": 0.2, "min_fit": 0.15,
+             # two printed variants (user): the PCB-to-wall gap at the floor plane runs 0.3 .. 1.9 mm (the pocket wall is vertical, the
+             # PCB tilted), so one spine cannot bear everywhere. Each variant's outer face is a straight line in (x, w) from its recess-bottom
+             # offset xb to its lip-top offset xt, found by clip_variants() as the largest that keeps wall_air off the wall at every spot the
+             # variant serves (a lean of ~8 deg, the wall's own). Plan: rectangle len x (under .. xmax) with R r_in (recess side) / r_out
+             # (wall side) corners. Marks: blind dimples on the lip top (1 for F, 2 for B), mark_d wide, mark_depth deep, at x mark_x,
+             # +-mark_dz along the edge: they touch nothing and change no fit
+             "r_in": 1.2, "r_out": 2.5, "mark_d": 0.8, "mark_depth": 0.4, "mark_x": -0.4, "mark_dz": 1.0},
+    # which spots (1-based, per half) take which variant: front edge (Alt, Shift/Z) = FRONT; back edge (R/T, Tab) and inner (right of B) = BACK
+    "clip_variants": {"front": {"left": [1, 5], "right": [1, 5], "marks": 1}, "back": {"left": [2, 3, 4], "right": [2, 3, 4], "marks": 2}},
     "clip_clear": 0.5, "clip_slide": 2.0, "clip_recess": [10.4, 3.8, 0.5], "clip_r": 1.5, "clip_floor_min": 4.0,
     "clip_pts": {"left": [[71.3, 6.3], [124.3, 29.5], [102.7, 81.0], [13.0, 85.6], [20.0, 26.9]],
                  "right": [[197.0, 6.7], [139.0, 30.0], [154.4, 80.0], [245.0, 85.6], [240.0, 26.9]]},
@@ -235,6 +246,85 @@ def place_jst(pcb, keep, sgn):
 
 def world(M, u, v, w):
     return tuple((M @ [u, v, w, 1])[:2])
+
+
+def clip_variants(pre, w_bot, wb_, w_slot, w_top):
+    """v2 (user): the two printed TPU clip variants, FRONT (spots P["clip_variants"]["front"]) and BACK. One profile, one plan, per
+    variant, valid at every spot it serves: the outer (wall-side) face is the straight line (xb, w_bot) -> (xt, w_top), the largest
+    that keeps clip["wall_air"] between the clip's sections and the pocket wall (all 10 mm of it, at 14 levels) and the recess's own
+    outline `fit` (min_fit) off them at the recess bottom, at every one of its spots. Start from the tightest centre-line wall offset
+    at each end less wall_air; step down by 0.01 at the end that fails (a pocket corner curving in along the clip: the back
+    edge's R3 / R4), then floor to 0.01. Returns {name: {name, xb, xt, profile, plan, marks, spots, gaps, spot_keys}}."""
+    cl = P["clip"]
+    out = {}
+    levels = [w_bot + 0.001 + (w_top - w_bot - 0.002) * i / 13 for i in range(14)]
+    u, lo, L = cl["under"], cl["lip_overlap"], cl["len"]
+    ld = cl["lead"] / math.tan(math.radians(cl["lip_lead"]))
+    for name, spec in P["clip_variants"].items():
+        keys = [(h, i) for h in ("left", "right") for i in spec[h]]
+        shape = lambda xb, xt: clip_shape(xb, xt, w_bot, wb_, w_slot, w_top)
+
+        def bad(xb, xt):
+            prof, plan = shape(xb, xt)
+            b = []
+            for k in keys:
+                p = pre[k]
+                for w in levels:
+                    sec = clip_section(prof, plan, w)
+                    sl = Polygon([tuple(p["c"] + p["t"] * z + p["n"] * x) for x, z in sec.exterior.coords])
+                    wall = p["o_at"](w)
+                    if not wall.buffer(-cl["wall_air"] + 1e-4).contains(sl):
+                        b.append(w)
+                    if w < w_bot + 0.01 and not p["rr_x"].buffer(-cl["min_fit"] + 1e-4).contains(sl):
+                        b.append(w)
+            return b
+        xb = min(pre[k]["wall_at"](w_bot) for k in keys) - cl["wall_air"]
+        xt = min(pre[k]["wall_at"](w_top) for k in keys) - cl["wall_air"]
+        for _ in range(300):
+            bd = bad(xb, xt)
+            if not bd:
+                break
+            if min(bd) < (w_bot + w_top) / 2:
+                xb -= 0.01
+            else:
+                xt -= 0.01
+        else:
+            raise SystemExit(f"clip variant {name}: no outer face clears every spot")
+        xb, xt = math.floor(xb * 100 + 1e-6) / 100, math.floor(xt * 100 + 1e-6) / 100
+        assert not bad(xb, xt), name
+        prof, plan = shape(xb, xt)
+        gaps = {}
+        for k in keys:
+            ws = {w: pre[k]["wall_at"](w) - (xb + (xt - xb) * (w - w_bot) / (w_top - w_bot)) for w in (w_bot, wb_, w_top)}
+            gaps[f"{k[0]} {k[1]}"] = [round(min(ws.values()), 3), round(max(ws.values()), 3)]
+        out[name] = {"name": name, "xb": xb, "xt": xt, "profile": [[round(x, 4), round(w, 4)] for x, w in prof],
+                     "plan": [(round(x, 4), round(z, 4)) for x, z in plan.exterior.coords], "marks": spec["marks"],
+                     "spots": {h: spec[h] for h in ("left", "right")}, "gaps": gaps, "spot_keys": keys}
+    allk = sorted(k for v in out.values() for k in v["spot_keys"])
+    assert allk == sorted((h, i) for h in ("left", "right") for i in range(1, 6)), allk  # 2 variants, all 10 spots exactly once
+    return out
+
+
+def clip_shape(xb, xt, w_bot, wb_, w_slot, w_top):
+    """A variant's side profile [(x out from the PCB edge, w)] and plan (shapely Polygon, (x, z along the edge))."""
+    cl = P["clip"]
+    u, lo, L = cl["under"], cl["lip_overlap"], cl["len"]
+    ld = cl["lead"] / math.tan(math.radians(cl["lip_lead"]))
+    prof = [(-u, w_bot), (xb, w_bot), (xt, w_top), (-lo, w_top), (-lo, w_slot + cl["lead"]), (-lo + ld, w_slot), (0.0, w_slot),
+            (0.0, wb_), (-u + ld, wb_), (-u, wb_ - cl["lead"])]
+    xp = max(xb, xt)
+    ri, ro = cl["r_in"], cl["r_out"]
+    A = box(-u, -L / 2, xp + 10, L / 2).buffer(-ri, quad_segs=8).buffer(ri, quad_segs=8)
+    B = box(-u - 10, -L / 2, xp, L / 2).buffer(-ro, quad_segs=8).buffer(ro, quad_segs=8)
+    return prof, A.intersection(B)
+
+
+def clip_section(prof, plan, w):
+    """The clip's cross-section (x, z) at the level w: the profile's x extents there, cut to the plan."""
+    hit = Polygon(prof).intersection(LineString([(-50, w), (50, w)]))
+    xs = [g_.bounds for g_ in getattr(hit, "geoms", [hit])]
+    sec = unary_union([box(x0, -50, x1, 50) for x0, _, x1, _ in xs]).intersection(plan)
+    return max(getattr(sec, "geoms", [sec]), key=lambda g_: g_.area) if not sec.is_empty else sec
 
 
 def place_clips(pcb, pts, sockets_real, stabs, jst_pocket):
@@ -824,28 +914,31 @@ def _build(lay):
     def floor_under(h, poly):  # the highest floor-plane point under poly
         return max(floor_z(h, x, y) for x, y in poly.exterior.coords)
     # v2 C-clip recesses, in the floor plane's local coordinates (which are the PCB's: the plane is parallel to it): along
-    # the PCB edge's tangent recess[0] long, recess[1] wide measured in from the pocket wall (found along the edge normal
-    # in the floor plane, so the clip's spine meets it), the wall side ON the wall (it is cut to the pocket: no undercut),
-    # R clip_r corners (Ø3 tool). Its lead-in is a 45 deg taper: `mouth` = the recess grown by its depth (cut to the
-    # pocket), tapered in over that depth by Fusion; `*_w` are the same in the world, on the floor plane.
+    # the PCB edge's tangent recess[0] long; the inner side a fixed recess[1] - snap_gap (2.9) in from the PCB edge, out to the pocket wall
+    # (found along the edge normal in the floor plane), which it is cut to (no undercut): its width is 2.9 + the wall gap there,
+    # 3.2 at the back edge .. 4.7 at the front (the vertical wall and the tilted PCB), not a constant. R clip_r corners (Ø3 tool). Its
+    # lead-in is a 45 deg taper: `mouth` = the recess grown by its depth (cut to the pocket), tapered in over that depth by
+    # Fusion; `*_w` are the same in the world, on the floor plane.
     rl_, rw_, rd_ = P["clip_recess"]
     cl_ = P["clip"]
     wb_ = -(P["plate_to_pcb"] + P["pcb_t"])  # the PCB underside plane
     w_bot = fw - rd_  # the recess bottom
     w_slot = wb_ + cl_["slot"]  # the lip's underside (the PCB top is 0.1 over it: it grips)
     w_top = w_slot + cl_["lip"]
+    pre = {}
     for h, d in halves.items():
         Mh = Ms[h]
         o_levels = {w_: to_local(Mh, w_, opens_h[h]) for w_ in (fw, w_bot, wb_, w_top)}  # the (vertical) wall seen in each plane
+        o_at = lambda w_, Mh=Mh, h=h: to_local(Mh, w_, opens_h[h])
         A_fw = [Mh[0, 0], Mh[0, 1], Mh[1, 0], Mh[1, 1], Mh[0, 2] * fw + Mh[0, 3], Mh[1, 2] * fw + Mh[1, 3]]
         for q in d["clips"]:
             c_, t_, n_ = (np.array(q[k_]) for k_ in ("edge_pt", "t", "n"))
-            def wall_at(w_, s_=0.0):  # the wall's distance from the PCB edge along the normal, in the plane w_ (s_ along the edge)
+            def wall_at(w_, s_=0.0, c_=c_, t_=t_, n_=n_, o_levels=o_levels):  # the wall's distance from the PCB edge along the normal, in the plane w_ (s_ along the edge)
                 c0_ = c_ + t_ * s_
                 hit = LineString([c0_, c0_ + n_ * 4.0]).intersection(o_levels[w_].exterior)
                 return min(Point(c0_).distance(p_) for p_ in getattr(hit, "geoms", [hit]))
             dw_ = wall_at(fw)
-            fr_ = lambda s_, q_: tuple(c_ + t_ * s_ + n_ * q_)
+            fr_ = lambda s_, q_, c_=c_, t_=t_, n_=n_: tuple(c_ + t_ * s_ + n_ * q_)
             # across the edge: from recess width less the nominal gap under the PCB (3.8 - 0.9 = 2.9: the 2.5 ledge, the 0.4 spare)
             # out past the pocket wall (the tilt makes the wall's offset 0.3 .. 1.9 mm from the PCB edge at the floor plane), then
             # cut to the pocket: the wall side is the wall itself (no undercut, no rounded corners there), the R clip_r corners
@@ -855,31 +948,30 @@ def _build(lay):
             rr_x = raw_x.buffer(-P["clip_r"], quad_segs=16).buffer(P["clip_r"], quad_segs=16)  # (corners past the wall: the wall side stays sharp)
             mo_x = rr_x.buffer(rd_, quad_segs=16)  # the lead-in's top outline, uncut: Fusion tapers it 45 deg down to rr_x, then trims to the wall
             rr_, mo_ = rr_x.intersection(o_levels[fw]), mo_x.intersection(o_levels[fw])
-            # the clip in its own frame (x = n out from the PCB edge, y = w up the PCB normal, z along the edge, centred):
-            # side profile, the spine face on the wall (wall_air off it; the wall is a plane: straight between two levels),
-            # the ledge under the PCB, the slot, the lip with its 30 deg lead-in, and a row of hex cells through it
-            sb_, st_ = wall_at(w_bot) - cl_["wall_air"], wall_at(w_top) - cl_["wall_air"]
-            ld_ = cl_["lead"] / math.tan(math.radians(cl_["lip_lead"]))
-            u_, lo_ = cl_["under"], cl_["lip_overlap"]
-            prof = [(-u_, w_bot), (sb_, w_bot), (st_, w_top), (-lo_, w_top), (-lo_, w_slot + cl_["lead"]), (-lo_ + ld_, w_slot), (0.0, w_slot),
-                    (0.0, wb_), (-u_ + ld_, wb_), (-u_, wb_ - cl_["lead"])]
-            cell, cw_ = cl_["lattice_cell"], cl_["lattice_wall"]
-            hy_ = cell / math.sqrt(3)  # pointy-top hexagon, across flats `cell` (along the edge), 2 hy_ vertex to vertex
-            nh_ = int((cl_["len"] - 2 * 0.7 + cw_) // (cell + cw_))  # 3 cells, 0.75 end walls
-            wc_ = (w_bot + wb_) / 2  # the middle of the ledge's height
-            hexes = [[(a0 + hy_ * math.cos(math.radians(60 * k_ + 30)), wc_ + hy_ * math.sin(math.radians(60 * k_ + 30))) for k_ in range(6)]
-                     for a0 in [(i_ - (nh_ - 1) / 2) * (cell + cw_) for i_ in range(nh_)]]
-            # the clip's plan (x out from the PCB edge, z along it) before the profile trims its sides: the recess's outline less the fit,
-            # and inside the pocket wall (seen at the clip's bottom and top levels) less wall_air: where the wall curves in along the
-            # clip's 10 mm (a pocket corner) the spine's end is trimmed to follow it, not left poking 0.1 into it
-            pl_ = rr_x.buffer(-cl_["fit"], quad_segs=16).intersection(o_levels[w_bot].buffer(-cl_["wall_air"], quad_segs=16)
-                                                                       ).intersection(o_levels[w_top].buffer(-cl_["wall_air"], quad_segs=16))
-            pl_ = max(getattr(pl_, "geoms", [pl_]), key=lambda g_: g_.area)  # (the piece the clip stands in)
-            plan_ = [(float((np.array(p_) - c_) @ n_), float((np.array(p_) - c_) @ t_)) for p_ in pl_.exterior.coords]
-            Lc = np.array([[n_[0], 0, n_[1], c_[0]], [n_[1], 0, -n_[0], c_[1]], [0, 1, 0, 0], [0, 0, 0, 1]])
+            pre[(h, q["name"])] = {"q": q, "c": c_, "t": t_, "n": n_, "wall_at": wall_at, "o_at": o_at, "rr_x": rr_x}
             q.update({"recess": rr_, "mouth": mo_, "wall_gap": float(dw_), "recess_w": affinity.affine_transform(rr_, A_fw),
-                      "mouth_w": affinity.affine_transform(mo_, A_fw), "mouth_ext_w": affinity.affine_transform(mo_x, A_fw), "recess_x": rr_x, "plan": plan_, "profile": prof, "lattice": hexes,
-                      "matrix": (Mh @ Lc).tolist(), "wall_n": [[w_, float(wall_at(w_))] for w_ in (w_bot, wb_, w_top)]})
+                      "mouth_w": affinity.affine_transform(mo_, A_fw), "mouth_ext_w": affinity.affine_transform(mo_x, A_fw), "recess_x": rr_x})
+    # the two printed variants (clip_variants): one profile / plan / lattice for every spot each serves
+    variants = clip_variants(pre, w_bot, wb_, w_slot, w_top)
+    ld_ = cl_["lead"] / math.tan(math.radians(cl_["lip_lead"]))
+    cell, cw_ = cl_["lattice_cell"], cl_["lattice_wall"]
+    hy_ = cell / math.sqrt(3)  # pointy-top hexagon, across flats `cell` (along the edge), 2 hy_ vertex to vertex
+    nh_ = int((cl_["len"] - 2 * 0.7 + cw_) // (cell + cw_))  # 3 cells, 0.75 end walls
+    wc_ = (w_bot + wb_) / 2  # the middle of the ledge's height
+    hexes = [[(a0 + hy_ * math.cos(math.radians(60 * k_ + 30)), wc_ + hy_ * math.sin(math.radians(60 * k_ + 30))) for k_ in range(6)]
+             for a0 in [(i_ - (nh_ - 1) / 2) * (cell + cw_) for i_ in range(nh_)]]
+    for vn_, v_ in variants.items():
+        v_["lattice"] = hexes
+    for h, d in halves.items():
+        Mh = Ms[h]
+        for q in d["clips"]:
+            c_, t_, n_ = pre[(h, q["name"])]["c"], pre[(h, q["name"])]["t"], pre[(h, q["name"])]["n"]
+            v_ = next(v__ for v__ in variants.values() if (h, q["name"]) in v__["spot_keys"])
+            Lc = np.array([[n_[0], 0, n_[1], c_[0]], [n_[1], 0, -n_[0], c_[1]], [0, 1, 0, 0], [0, 0, 0, 1]])
+            q.update({"variant": v_["name"], "plan": v_["plan"], "profile": v_["profile"], "lattice": hexes,
+                      "matrix": (Mh @ Lc).tolist(), "wall_n": [[w_, float(pre[(h, q["name"])]["wall_at"](w_))] for w_ in (w_bot, wb_, w_top)]})
+    for v_ in variants.values():
+        v_.pop("spot_keys")
     islands = []
     bosses = [(f"insert boss {i + 1}", q.x, q.y, P["insert_hole"][0] / 2, P["panel_t"] + insert_depths[i])
               for i, q in enumerate(screws)]
@@ -1028,7 +1120,7 @@ def _build(lay):
 
     minx, miny, maxx, maxy = outline.bounds
     return {
-        "params": P, "layers": layers, "udb": udb, "socket_box": SOCKET, "floor_w": FLOOR_W, "pcb_mid_w": PCB_MID_W,
+        "params": P, "clip_variants": variants, "layers": layers, "udb": udb, "socket_box": SOCKET, "floor_w": FLOOR_W, "pcb_mid_w": PCB_MID_W,
         "ridge_x": ridge, "y_front": y_front, "lift": lift, "h_front": min(heights["front_left"], heights["front_right"]),
         "max_height": max(heights.values()), "heights": heights, "heights_cut": heights_cut, "max_height_cut": max_cut,
         "rear_cut": rear_cut, "floor_min_z": low + lift, "cap_gap": cap_gap, "web_min": web_min, "web_sym": web_sym,

@@ -148,7 +148,8 @@ def W(m, u, v, w):
 PARTS = {  # export component <- (source component, body names or None for all)
     "Body": ("Case", ["Body"]), "Panel": ("Case", ["Panel"]),
     "PlateL": ("PlateL", None), "PlateR": ("PlateR", None), "PcbL": ("PcbL", None), "PcbR": ("PcbR", None),
-    "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]), "TpuClip": ("TpuClip", None),  # v2: no feet or PCB snaps
+    "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]), "TpuClipFront": ("TpuClipFront", None),
+    "TpuClipBack": ("TpuClipBack", None),  # v2: no feet or PCB snaps; two TPU clip variants (front 4, back 6)
 }
 
 
@@ -182,7 +183,7 @@ def step():
     for name in PARTS:
         fn = name.lower()
         fn = fn[:-1] + "_left" if name in ("PlateL", "PcbL") else fn[:-1] + "_right" if name in (
-            "PlateR", "PcbR") else "tpu_clip" if name == "TpuClip" else fn
+            "PlateR", "PcbR") else "tpu_clip_" + name[7:].lower() if name.startswith("TpuClip") else fn
         path = os.path.join(OUT, "step", fn + ".step")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         assert em.execute(em.createSTEPExportOptions(path, comp(name)))
@@ -566,20 +567,25 @@ def whole():
 
 
 def v2_prints(out=None):
-    """v2: whole body and panel plus the TPU clip (single and 10-up plate) -> prints/v2/ (run after copy())."""
+    """v2: whole body and panel plus the two TPU clip variants (single, and a 4-up FRONT / 6-up BACK plate) -> prints/v2/
+    (run after copy()). The old single-variant tpu_clip.stl / tpu_clip_x10.stl are removed."""
     out = out or os.path.join(PRINTS, "v2")
     os.makedirs(out, exist_ok=True)
-    for n, f in (("Body", "case_body"), ("Panel", "bottom_panel"), ("TpuClip", "tpu_clip")):
+    for old in ("tpu_clip.stl", "tpu_clip_x10.stl"):
+        if os.path.exists(os.path.join(out, old)):
+            os.remove(os.path.join(out, old))
+    for n, f in (("Body", "case_body"), ("Panel", "bottom_panel"), ("TpuClipFront", "tpu_clip_front"), ("TpuClipBack", "tpu_clip_back")):
         b = put(n + "Print", [to_origin(cp(body(n)))], hidden=True).bRepBodies.item(0)
         info(f, b)
         mesh(b, os.path.join(out, f + ".stl"))
-    cl, y = [], 0.0
-    for i in range(10):  # one multi-lump body: a component with several bodies did not export
-        t = to_origin(cp(body("TpuClip")), 0, y)
-        y = bbox(t)[4] + 4
-        cl.append(t)
-    for b in cl[1:]:
-        op(cl[0], b, "Union")
-    b = put("ClipsPrint", cl[:1], hidden=True).bRepBodies.item(0)
-    info("tpu_clip_x10", b)
-    mesh(b, os.path.join(out, "tpu_clip_x10.stl"))
+    for n, f, k in (("TpuClipFront", "tpu_clip_front_x4", 4), ("TpuClipBack", "tpu_clip_back_x6", 6)):
+        cl, y = [], 0.0
+        for i in range(k):  # one multi-lump body: a component with several bodies did not export
+            t = to_origin(cp(body(n)), 0, y)
+            y = bbox(t)[4] + 4
+            cl.append(t)
+        for b in cl[1:]:
+            op(cl[0], b, "Union")
+        b = put(n + "Plate", cl[:1], hidden=True).bRepBodies.item(0)
+        info(f, b)
+        mesh(b, os.path.join(out, f + ".stl"))

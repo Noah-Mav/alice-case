@@ -33,16 +33,30 @@ Whole parts, flat on the bed, millimetres. Exported from Fusion "Alice Case" v9 
 
 ## Print files v2
 
-Exported from Fusion "Alice Case v2" version 7 by `v2_prints()` in `case/fusion_export.py`, into `prints/v2/`. Millimetres, lowest point on z 0.
+Exported from Fusion "Alice Case v2" version 8 by `v2_prints()` in `case/fusion_export.py`, into `prints/v2/`. Millimetres, lowest point on z 0.
 
 | File | Material | Orientation / supports |
 |---|---|---|
 | `v2/case_body.stl` | PLA or PETG | One piece, bottom down (as modelled), as for v1. 284.7 x 105.7 x 39.3 mm. Supports under the panel-recess area. |
 | `v2/bottom_panel.stl` | PLA or PETG | One piece, outer (desk) face down, no supports. 212.2 x 54.9 mm. |
-| `v2/tpu_clip.stl` | TPU 95A | One PCB C-clip, 3.4 x 6.5 x 10 mm. |
-| `v2/tpu_clip_x10.stl` | TPU 95A | The 10 clips on one plate (one per recess). |
+| `v2/tpu_clip_front.stl` | TPU 95A | FRONT C-clip, 4.3 x 6.5 x 10 mm, **one dimple** on the lip top. |
+| `v2/tpu_clip_back.stl` | TPU 95A | BACK C-clip, 3.4 x 6.5 x 10 mm, **two dimples** on the lip top. |
+| `v2/tpu_clip_front_x4.stl` | TPU 95A | 4 FRONT clips on one plate. |
+| `v2/tpu_clip_back_x6.stl` | TPU 95A | 6 BACK clips on one plate. |
+
+Which clip goes where (10 spots, 5 per half, same in the left and right half):
+
+| Spot (per half) | Where | Clip |
+|---|---|---|
+| 1 | front edge, under Alt | FRONT (1 dimple) |
+| 2 | inner edge, right of B | BACK (2 dimples) |
+| 3 | back edge, above R / T | BACK (2 dimples) |
+| 4 | back edge, above Tab | BACK (2 dimples) |
+| 5 | front edge, under Shift / Z | FRONT (1 dimple) |
+
+So 4 FRONT + 6 BACK. The two differ only in the outer (wall-side) face, which leans with the pocket wall it bears on: FRONT 1.76 mm out at the bottom to 0.85 at the lip top, BACK 0.0 to 0.85. Slot (1.5 for the 1.6 PCB), 1.0 lip, 2.5 ledge, lattice and 10 mm length are identical. Each is 0.1 mm off the wall at its tightest point and at most 0.15 (FRONT) / 0.35 (BACK spots 3 and 4) / 0.58 (BACK spot 2) away along the face.
 
 - **Reused from v1:** the same dummy PCBs and plates (`dummy_pcb_*.stl`, `dummy_plate_*.stl`) and the switch fit strip. The v2 case is built round the frozen v1 outlines.
 - **Gone from v1:** no TPU feet and no PCB snaps. The feet are replaced by 4 bumpon recesses (8 mm round, 0.5 mm deep) for **3M SJ5302** bumpons, 4 needed.
-- **Clips are untested.** Print one `tpu_clip.stl` first and check the grip on the 1.6 mm PCB edge and the fit in a recess before printing the 10-up plate.
+- **Clips are untested.** Print one `tpu_clip_front.stl` and one `tpu_clip_back.stl` first and check the grip on the 1.6 mm PCB edge and the fit in a recess before printing the plates.
 - The v1 files above stay as they are so older links keep working.

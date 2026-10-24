@@ -38,13 +38,13 @@ What changed in v2:
 - Stepped USB opening: a 17 mm neck with a 22 mm chamber behind it.
 - Rear peak cut (4 mm drop) to bring the back down.
 - A wider bottom panel, centred on the new centreline, with a deeper field (0.6 mm).
-- No more TPU feet or PCB snaps: 4 bumpon recesses (3M SJ5302) instead, and 10 TPU C-clips that grip the PCB edge.
+- No more TPU feet or PCB snaps: 4 bumpon recesses (3M SJ5302) instead, and 10 TPU C-clips that grip the PCB edge, in two variants (FRONT x4, BACK x6) because the vertical pocket wall sits 0.2 to 1.9 mm from the tilted PCB edge.
 - Floor grooves with R2 corners and clip keep-outs, kept clear of the clip recesses.
 - The PCB and plate are frozen from v1, so the same dummy PCBs fit.
 
 ![Floor map as built](docs/images/v2/floor_map_built.png)
 
-Print files for v2 are in [prints/v2/](prints/v2/) (see [prints/README.md](prints/README.md)). The TPU clips are untested.
+Print files for v2 are in [prints/v2/](prints/v2/) (see [prints/README.md](prints/README.md)). The TPU clips are untested (Fusion version 8; two variants, see prints/README.md).
 
 ## Clone
 

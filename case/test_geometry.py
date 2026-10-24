@@ -246,33 +246,43 @@ for h, d in g["halves"].items():
         for w_ in (w_pcb, w_pcb + P["pcb_t"]):
             hit = LineString([Point(q["edge_pt"]), Point(*(np.array(q["edge_pt"]) + n * 4.0))]).intersection(o_at(w_).exterior)
             assert min(Point(q["edge_pt"]).distance(p_) for p_ in getattr(hit, "geoms", [hit])) >= P["pcb_wall_min"] - 2e-3, (h, q["name"], w_)
-        # the clip: profile in (x out from the PCB edge, w), extruded cl["len"] along the edge. Spine on the wall less wall_air;
-        # the whole body inside the recess at its bottom (rounded R1.2 where its corners meet the R1.5 ones: checked below),
-        # the slot 1.5 high over the PCB, the lip, the lead-in 30 deg
-        prof = q["profile"]
+        # the PRINTED variant (g["clip_variants"]: the same profile and plan at every spot it serves), placed at this spot: profile in
+        # (x out from the PCB edge, w), extruded cl["len"] along the edge, cut to the plan. Cross-sections at 14 levels (and the
+        # chamfers' ends) placed in the PCB frame: clear of the pocket wall by wall_air (0.1), of the recess outline by >= min_fit
+        # (0.15) at the recess bottom, of the PCB (but the 0.1 grip of the lip), of the plate; the slot 1.5 high over the PCB, the
+        # lip, the 30 deg lead-in, the 6.5 total height
+        var = g["clip_variants"][q["variant"]]
+        assert (h, q["name"]) in [(h_, i_) for h_ in ("left", "right") for i_ in var["spots"][h_]] and q["profile"] == var["profile"] and q["plan"] == var["plan"]
+        prof, plan = var["profile"], Polygon(var["plan"])
         xs_p, ws_p = [a for a, _ in prof], [b_ for _, b_ in prof]
         slot_lo, slot_hi = G.FLOOR_W + P["floor_air"], G.FLOOR_W + P["floor_air"] + cl["slot"]
         assert abs(min(ws_p) - w_bot) < 1e-9 and abs(min(xs_p) + cl["under"]) < 1e-9
         assert abs(max(ws_p) - (slot_hi + cl["lip"])) < 1e-6 and abs(max(ws_p) - w_bot - (D_c + P["floor_air"] + cl["slot"] + cl["lip"])) < 1e-6
         assert abs(max(ws_p) - w_bot - 6.5) < 1e-6  # total height (the 6.6 spec: the PCB top is 0.1 over the slot's roof)
-        body_bot = Polygon([fr(-cl["len"] / 2, -cl["under"]), fr(cl["len"] / 2, -cl["under"]), fr(cl["len"] / 2, max(xs_p[1], 0.01)),
-                            fr(-cl["len"] / 2, max(xs_p[1], 0.01))]).buffer(-1.2, quad_segs=16).buffer(1.2, quad_segs=16)
-        assert rec_.buffer(1e-6).contains(body_bot), (h, q["name"])  # recess-fit: the clip's bottom in its recess
-        # fit clearance: the clip's plan (the recess outline less `fit`, then trimmed by the profile's ledge side and spine) lies in
-        # the recess's own outline (rx_: 10.4 x 3.8 R1.5, running past the wall) at its bottom, the narrowest (the taper only widens it)
-        plan_ = Polygon([tuple(np.array(q["edge_pt"]) + t * z_ + n * x_) for x_, z_ in q["plan"]]).intersection(
-            Polygon([fr(-cl["len"] / 2 - 1, -cl["under"]), fr(cl["len"] / 2 + 1, -cl["under"]), fr(cl["len"] / 2 + 1, q["wall_gap"] - cl["wall_air"]), fr(-cl["len"] / 2 - 1, q["wall_gap"] - cl["wall_air"])]))
+        assert prof[1] == [var["xb"], w_bot] and prof[2] == [var["xt"], max(ws_p)] and prof[6][1] == slot_hi and prof[7] == [0.0, slot_lo]  # outer face, slot 1.5, PCB edge at x = 0
+        assert abs(plan.bounds[0] + cl["under"]) < 1e-3 and abs(plan.bounds[1] + cl["len"] / 2) < 0.05 and abs(plan.bounds[3] - cl["len"] / 2) < 0.05
+        plate_lo = L_["plate"][0]
+        pcb_loc = d["pcb"]
+        o_min = 9.0
         rx_ = q["recess_x"]
-        fit_ = rx_.exterior.distance(plan_.exterior)
-        assert rx_.contains(plan_) and cl["fit"] >= cl["min_fit"] and fit_ >= cl["min_fit"] - 1e-6, (h, q["name"], fit_)
-        assert abs(plan_.bounds[0] - plan_.bounds[2]) > 0 and abs(plan_.area) > 0.9 * 9.4 * (cl["under"] + 0.1)  # (not eaten)
-        assert 0.1 <= q["profile"][1][0] <= q["wall_gap"] + 0.0 + 1e-6 or q["profile"][1][0] <= q["wall_gap"] + 1e-6, (h, q["name"])  # spine on the wall side
-        for a_, w_ in ((prof[1][0], w_bot), (prof[2][0], slot_hi + cl["lip"])):
-            wn_ = float(next(v for k_, v in q["wall_n"] if abs(k_ - w_) < 1e-9))
-            assert abs(a_ - (wn_ - cl["wall_air"])) < 1e-6, (h, q["name"], w_)
-        # the plan, wall side included, stays wall_air inside the pocket wall at the clip's bottom and top levels (the wall may curve in)
-        for w_ in (w_bot, slot_hi + cl["lip"]):
-            assert o_at(w_).buffer(-cl["wall_air"] + 1e-6).contains(Polygon([tuple(np.array(q["edge_pt"]) + t * z_ + n * x_) for x_, z_ in q["plan"]])), (h, q["name"], w_)
+        fit_ = 9.0
+        for k_ in range(14):
+            w_ = w_bot + 0.001 + (max(ws_p) - w_bot - 0.002) * k_ / 13
+            sec_ = G.clip_section(prof, plan, w_)
+            sl_ = Polygon([tuple(np.array(q["edge_pt"]) + t * z_ + n * x_) for x_, z_ in sec_.exterior.coords])
+            wl_ = o_at(w_)
+            assert wl_.contains(sl_) and wl_.exterior.distance(sl_) >= cl["wall_air"] - 1e-3, (h, q["name"], w_, wl_.exterior.distance(sl_))  # no collision with the pocket wall, air >= 0.1
+            o_min = min(o_min, wl_.exterior.distance(sl_))
+            if k_ == 0:  # the recess bottom (its narrowest: the 45 deg lead-in only widens it)
+                assert rx_.contains(sl_), (h, q["name"])
+                fit_ = rx_.exterior.distance(sl_)
+            if slot_lo <= w_ <= slot_lo + P["pcb_t"]:  # the PCB's thickness: it meets the clip only in the lip's 0.1 grip (above its underside + slot)
+                ov_ = pcb_loc.intersection(sl_).area
+                assert (ov_ < 0.01 * cl["len"]) == (w_ < slot_hi), (h, q["name"], w_, ov_)  # (< 0.01 mm deep: the PCB edge touches the spine face at x = 0)
+            assert w_ < plate_lo - 0.5  # under the plate (its underside)
+        assert fit_ >= cl["min_fit"] - 1e-3 and cl["fit"] >= cl["min_fit"], (h, q["name"], fit_)
+        assert q["edge_dev"] <= 0.15, (h, q["name"], q["edge_dev"])  # the slot (x = 0) lies on the PCB edge within 0.15 along the clip's 10 mm
+        q["_air"], q["_fit"] = o_min, fit_
         assert len(q["lattice"]) == 3 and all(len(hx) == 6 for hx in q["lattice"])
         hx_w = [p_[1] for p_ in q["lattice"][0]]
         assert abs((max(hx_w) - min(hx_w)) - cl["lattice_cell"] * 2 / math.sqrt(3)) < 1e-9  # 2.3 across flats
@@ -286,6 +296,21 @@ for h, d in g["halves"].items():
         assert np.allclose(Mc @ [0, 0, 0, 1], Ms[h] @ [q["edge_pt"][0], q["edge_pt"][1], 0, 1], atol=1e-6)
     for a_, b_ in zip(d["clips"], d["clips"][1:]):
         assert a_["mouth"].distance(b_["mouth"]) > 3.0  # no two recesses meet
+# the two printed variants cover the 10 spots exactly once (FRONT 4: spots 1 and 5 per half; BACK 6: 2, 3, 4), the outer face bears on the wall
+# (0.1 air at the tightest point over its spots, <= 0.5 gap along the face at the front and back-edge spots; the inner spot 2: <= 0.6)
+cv = g["clip_variants"]
+assert set(cv) == {"front", "back"}
+cover = sorted((v_["name"], h_, i_) for v_ in cv.values() for h_ in ("left", "right") for i_ in v_["spots"][h_])
+assert [(c_[1], c_[2]) for c_ in cover if c_[0] == "front"] == [("left", 1), ("left", 5), ("right", 1), ("right", 5)] and len(cover) == 10 and \
+    len({(c_[1], c_[2]) for c_ in cover}) == 10 and sum(c_[0] == "back" for c_ in cover) == 6, cover
+for n_, v_ in cv.items():
+    airs = [q["_air"] for h_, d_ in g["halves"].items() for q in d_["clips"] if q["variant"] == n_]
+    assert min(airs) <= P["clip"]["wall_air"] + 0.01 and min(airs) >= P["clip"]["wall_air"] - 1e-3, (n_, min(airs))  # 0.1 air at its tightest point
+    for k_, (g0, g1) in v_["gaps"].items():
+        assert g0 >= P["clip"]["wall_air"] - 1e-3 and g1 <= (0.6 if k_.endswith(" 2") else 0.5), (n_, k_, g0, g1)
+    assert v_["marks"] == (1 if n_ == "front" else 2) and v_["xb"] > v_["xt"] - 1e-9 if n_ == "front" else v_["xb"] < v_["xt"]  # the lean of its wall
+print("clip variants:", {n_: (v_["xb"], v_["xt"], round(min(g_[0] for g_ in v_["gaps"].values()), 2), round(max(g_[1] for g_ in v_["gaps"].values()), 2),
+                              {k_: g_ for k_, g_ in v_["gaps"].items() if k_.endswith(" 2")}) for n_, v_ in cv.items()})
 
 # §6.9 UDB (M5: hung upside down from the body): centred on the ridge, back face udb_air under the slot roof,
 # receptacle on its underside, face <= 1.5 behind the rear; two front standoffs into the bay ceiling.

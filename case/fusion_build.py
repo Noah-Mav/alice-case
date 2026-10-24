@@ -16,7 +16,7 @@ Milestones add a build_* function and a line in run(): M2 flat parts, M3 case co
 Output is printed and also appended to case/out/fusion_build.log (a slow STEP import can outlast the MCP call).
 
 v2 (2026-10): every run builds a NEW document, "Alice Case v2" (DOC_NAME; there is no INTO_ACTIVE: v1 stays untouched).
-The PCB is held by 10 printable TPU C-clips in recesses in the pocket floors (build_clip, clip_recesses), not by snaps;
+The PCB is held by 10 printable TPU C-clips (two variants: FRONT x4, BACK x6) in recesses in the pocket floors (build_clip, clip_recesses), not by snaps;
 the feet are 4 bumpon recesses (3M SJ5302); the rear peak is cut by one plane (rear_cut); see case/out/v2_changes.md.
 """
 import json
@@ -136,7 +136,7 @@ def appearance(name, rgb):
 
 def build_half(root, g, h):
     """M2: plate, PCB (+ socket keep-outs, JST header and its plug pocket), switches, keycap envelopes, and (v2) the
-    5 TPU C-clips on the PCB's edge, each shaped to its spot (build_clip: the spine fills the gap to the wall there)."""
+    5 TPU C-clips on the PCB's edge: the printed FRONT or BACK variant at each spot (build_clip, the same data as TpuClipFront / Back)."""
     d, L, s = g["halves"][h], g["layers"], "L" if h == "left" else "R"
     asm = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     asm.component.name = "Left" if h == "left" else "Right"
@@ -153,7 +153,8 @@ def build_half(root, g, h):
     }
     for q in d["clips"]:  # v2: q["matrix"] = the clip frame (x out from the PCB edge, y up the plate normal, z along the edge) -> world
         occs[f"clip{q['name']}"] = build_clip(c, f"Clip{q['name']}{s}", q["matrix"], q["profile"], q["lattice"],
-                                              g["params"]["clip"]["len"], q["plan"], ctx=asm)
+                                              g["params"]["clip"]["len"], q["plan"], ctx=asm,
+                                              marks=g["clip_variants"][q["variant"]]["marks"], mark=g["params"]["clip"])
     return asm, occs
 
 
@@ -164,11 +165,13 @@ def build_udb(root, g):
                 ("USBReceptacle", [u["receptacle"]], u["receptacle_z"]))
 
 
-def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None):
+def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None, marks=0, mark=None):
     """v2: one TPU C-clip as one body in its own component. profile = the side view in the component's XY (x out from the
     PCB edge toward the wall, y = height), extruded +- length / 2 along z (the edge); hexes = the lattice cells (z along
     the edge, y height) cut through along x. plan = the clip's plan (x out, z along the edge; the recess outline less the
-    fit clearance): the profile prism is intersected with it (rounds the corners clear of the recess's R1.5 ones). Placed with matrix m."""
+    fit clearance): the profile prism is intersected with it (rounds the corners clear of the recess's R1.5 ones). Placed with matrix m.
+    marks = the variant's identifier: that many blind dimples (mark = the P["clip"] dict: mark_d, mark_depth, mark_x, mark_dz) in the
+    lip's top face (1 = FRONT, 2 = BACK); they touch nothing and change no fit."""
     occ = parent.occurrences.addNewComponent(matrix(m))
     c = occ.component
     c.name = name
@@ -204,6 +207,30 @@ def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None):
     inp.setSymmetricExtent(adsk.core.ValueInput.createByString("40 mm"), True)
     inp.participantBodies = [c.bRepBodies.item(0)]  # only the clip
     c.features.extrudeFeatures.add(inp).name = "LatticeCut"
+    if marks:
+        ytop = max(p[1] for p in profile)
+        pin = c.constructionPlanes.createInput()
+        pin.setByOffset(c.xZConstructionPlane, adsk.core.ValueInput.createByReal(ytop * MM))
+        pl = c.constructionPlanes.add(pin)
+        if abs(pl.geometry.origin.y - ytop * MM) > 1e-6:  # (the plane's normal runs the other way)
+            pl.deleteMe()
+            pin = c.constructionPlanes.createInput()
+            pin.setByOffset(c.xZConstructionPlane, adsk.core.ValueInput.createByReal(-ytop * MM))
+            pl = c.constructionPlanes.add(pin)
+        pl.name = "MarkPlane"
+        sm = c.sketches.add(pl)
+        sm.name = "Marks"
+        for k in range(marks):
+            z = (k - (marks - 1) / 2) * 2 * mark["mark_dz"]
+            sm.sketchCurves.sketchCircles.addByCenterRadius(sm.modelToSketchSpace(P3(mark["mark_x"], ytop, z)), mark["mark_d"] / 2 * MM)
+        coll = adsk.core.ObjectCollection.create()
+        for i in range(sm.profiles.count):
+            coll.add(sm.profiles.item(i))
+        inp = c.features.extrudeFeatures.createInput(coll, adsk.fusion.FeatureOperations.CutFeatureOperation)
+        down = adsk.fusion.ExtentDirections.PositiveExtentDirection if pl.geometry.normal.y < 0 else adsk.fusion.ExtentDirections.NegativeExtentDirection
+        inp.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(mark["mark_depth"] * MM)), down)
+        inp.participantBodies = [c.bRepBodies.item(0)]  # only the clip
+        c.features.extrudeFeatures.add(inp).name = "MarkCut"
     b = c.bRepBodies.item(0)
     b.name = name
     b.appearance = appearance("TPU clip orange", (255, 120, 0))
@@ -211,23 +238,28 @@ def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None):
 
 
 def build_tpu_clip(root, g):
-    """v2: the printable TPU C-clip itself, one watertight body "TpuClip", the nominal part (the fit bodies in the halves
-    take each spot's wall offsets): 10 long, slot 1.5 for the 1.6 PCB, 2.5 under it, a 1.0 lip 1.5 over it with a 30 deg
-    lead-in, a snap_gap (0.9) spine, a lattice (2.3 cells, 0.8 walls) in the ledge; ~6.5 high (the PCB's underside is
-    y = 0, the clip rises 2.5 above it and 4.0 below). Placed off the case, as it prints on its spine's outer face."""
+    """v2: the two printable TPU C-clips, each one watertight body: "TpuClipFront" (4: spots 1 and 5 per half) and "TpuClipBack"
+    (6: 2, 3, 4), exactly the geometry placed at their spots in the halves (g["clip_variants"]): 10 long, slot 1.5 for the 1.6 PCB,
+    2.5 under it, a 1.0 lip 1.5 over it with a 30 deg lead-in, an outer face leaning with its wall (FRONT 1.76 at the bottom -> 0.85
+    at the lip top; BACK 0.0 -> 0.85), a lattice (2.3 cells, 0.8 walls) in the ledge, and 1 (FRONT) or 2 (BACK) dimples in the lip
+    top; 6.5 high (the PCB's underside is y = 0, the clip rises 2.5 above it and 4.0 below). Placed off the case."""
     P = g["params"]
-    q = g["halves"]["left"]["clips"][0]
     wb = g["floor_w"] + P["floor_air"]  # the PCB underside plane
-    prof = [[x, w - wb] for x, w in q["profile"]]
-    prof[1][0] = prof[2][0] = P["snap_gap"]  # the spine: the PCB-to-wall gap at mid-PCB, straight
-    lat = [[[a, w - wb] for a, w in hx] for hx in q["lattice"]]
     x0 = min(p[0] for p in g["outline"]) - 40.0
-    occ = build_clip(root, "TpuClip", [[1, 0, 0, x0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], prof, lat, P["clip"]["len"], q["plan"])
-    b = occ.component.bRepBodies.item(0)
-    log(f"TpuClip: {occ.component.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.1f} mm3, "
-        f"{P['clip']['len']} long x {max(p[1] for p in prof) - min(p[1] for p in prof):.1f} high x "
-        f"{max(p[0] for p in prof) - min(p[0] for p in prof):.1f} deep; {sum(len(d['clips']) for d in g['halves'].values())} needed")
-    return occ
+    out = {}
+    for i, (vn, v) in enumerate(g["clip_variants"].items()):
+        prof = [[x, w - wb] for x, w in v["profile"]]
+        lat = [[[a, w - wb] for a, w in hx] for hx in v["lattice"]]
+        nm = "TpuClip" + vn.capitalize()
+        occ = build_clip(root, nm, [[1, 0, 0, x0], [0, 1, 0, 0], [0, 0, 1, 20.0 * i], [0, 0, 0, 1]], prof, lat, P["clip"]["len"], v["plan"],
+                         marks=v["marks"], mark=P["clip"])
+        b = occ.component.bRepBodies.item(0)
+        log(f"{nm}: {occ.component.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.2f} mm3, "
+            f"{P['clip']['len']} long x {max(p[1] for p in prof) - min(p[1] for p in prof):.1f} high x "
+            f"{max(p[0] for p in prof) - min(p[0] for p in prof):.1f} deep; face {v['xb']} -> {v['xt']}; "
+            f"{sum(len(d_) for d_ in (v['spots']['left'], v['spots']['right']))} needed")
+        out[vn] = occ
+    return out
 
 
 def import_udb_step(udb):
@@ -247,8 +279,11 @@ def import_udb_step(udb):
 def check_volumes(g, halves, tol=0.02):
     """v2: every flat placeholder's bodies must add up to the volume the JSON predicts (expect_vol, shapely union area x
     thickness), within tol: a feature that touches more than its target shreds them (the plate bbox check alone only
-    sees the bbox). The TPU clips: 50 % .. 102 % of the nominal TpuClip."""
+    sees the bbox). The TPU clips: each placed one the same volume (0.2 %) as its printed variant (TpuClipFront / TpuClipBack)."""
     bad, n = [], 0
+    root_ = adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct).rootComponent
+    printed = {vn: next(o.component.bRepBodies.item(0).volume * 1000 for o in root_.occurrences if o.component.name == "TpuClip" + vn.capitalize())
+               for vn in g["clip_variants"]}
     for h, (asm, occs) in halves.items():
         tot = {}
         for o in occs.values():
@@ -262,14 +297,11 @@ def check_volumes(g, halves, tol=0.02):
             if abs(got - want) > tol * want:
                 bad.append(f"{h} {k}: {got:.1f} vs {want:.1f} mm3 ({(got / want - 1) * 100:+.1f} %)")
             log(f"  volume {h} {k}: {got:.1f} mm3, JSON expects {want:.1f} ({(got / want - 1) * 100:+.2f} %)")
-        nom = None
-        for o in occs.values():
-            if o.component.name.startswith("Clip"):
-                v = o.component.bRepBodies.item(0).volume * 1000
-                nom = nom or max(x.component.bRepBodies.item(0).volume * 1000 for x in occs.values() if x.component.name.startswith("Clip"))
-                n += 1
-                if not 0.5 * nom <= v <= 1.02 * nom:
-                    bad.append(f"{h} {o.component.name}: {v:.1f} mm3 (clips run {nom:.1f} at most)")
+        for q in g["halves"][h]["clips"]:  # the printed variant placed at the spot: the same volume as TpuClipFront / Back
+            v = occs[f"clip{q['name']}"].component.bRepBodies.item(0).volume * 1000
+            n += 1
+            if abs(v - printed[q["variant"]]) > 0.002 * printed[q["variant"]]:
+                bad.append(f"{h} {q['name']}: {v:.2f} mm3 (printed {q['variant']} {printed[q['variant']]:.2f})")
     log(f"CHECK placeholder volumes ({n} sums vs the JSON, +-{tol * 100:.0f} %): {len(bad)} off {bad} -> {'PASS' if not bad else 'FAIL'}")
 
 
@@ -897,6 +929,27 @@ def check_m3(design, g, halves, udb, case):
     log(f"CHECK interference, case Body + Panel vs {nplace} placeholder bodies + UDB: {len(hits)} pair(s) {hits[:20]} -> "
         f"{'PASS' if not hits else 'FAIL'}")
 
+    # v2 the PRINTED variants at their spots (the bodies in the halves are the TpuClipFront / Back geometry, not per-spot fit bodies):
+    # none touches the Body (>= wall_air - 0.02 from it, i.e. no collision with the pocket wall or the recess walls, the 0.2 fit
+    # and the 0.1 air), the tightest spot of each variant is at 0.1, and each meets its PCB only in the lip's 0.1 grip
+    # (the interference volume <= 1.6 mm3: 1.5 over the edge x 0.1 x 10)
+    grip = 0.0
+    nvar = {"front": 0, "back": 0}
+    for h, (asm, occs) in halves.items():
+        for q in g["halves"][h]["clips"]:
+            cb = occs[f"clip{q['name']}"].component.bRepBodies.item(0).createForAssemblyContext(occs[f"clip{q['name']}"])
+            vn = q["variant"]
+            nvar[vn] += 1
+            ents_ = adsk.core.ObjectCollection.create()
+            ents_.add(cb)
+            ents_.add(occs["pcb"].component.bRepBodies.item(0).createForAssemblyContext(occs["pcb"]))
+            inp_ = design.createInterferenceInput(ents_)
+            inp_.areCoincidentFacesIncluded = False
+            r_ = design.analyzeInterference(inp_)
+            grip = max([grip] + [r_.item(i).interferenceBody.volume * 1000 for i in range(r_.count)])
+    ok["variants"] = nvar == {"front": 4, "back": 6} and 0 < grip <= 1.6
+    log(f"CHECK printed clip variants at their spots: FRONT {nvar['front']} + BACK {nvar['back']} = 10; interference with the Body (above), "
+        f"largest PCB grip overlap {grip:.2f} mm3 (want 0 < v <= 1.6) -> {'PASS' if ok['variants'] else 'FAIL'}")
     # v2 PCB-to-wall gap: from the PCB edge at each C-clip's centre, at the PCB's underside, mid and top, to the case Body: at
     # least pcb_wall_min (0.80) at all three; the pocket is vertical and the PCB tilted, so it is 0.8 .. 1.3 over the clips
     worst = 9.0
