@@ -14,6 +14,10 @@ placed with each half's local -> world matrix (set when the occurrence is create
 
 Milestones add a build_* function and a line in run(): M2 flat parts, M3 case core (build_case), M7 exports.
 Output is printed and also appended to case/out/fusion_build.log (a slow STEP import can outlast the MCP call).
+
+v2 (2026-10): every run builds a NEW document, "Alice Case v2" (DOC_NAME; there is no INTO_ACTIVE: v1 stays untouched).
+The PCB is held by 10 printable TPU C-clips in recesses in the pocket floors (build_clip, clip_recesses), not by snaps;
+the feet are 4 bumpon recesses (3M SJ5302); the rear peak is cut by one plane (rear_cut); see case/out/v2_changes.md.
 """
 import json
 import math
@@ -24,13 +28,14 @@ import adsk.core
 import adsk.fusion
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out") if "__file__" in globals() else \
-    os.path.expanduser("~/Documents/Development/alice-case/case/out")
+    os.path.expanduser("~/Documents/Development/personal/alice-case/case/out")
 JSON = os.path.join(OUT, "case_geometry.json")
 UDB_STEP = os.path.join(OUT, "uDB-C3-3D-model.step")  # optional; the box placeholder is always built
 # STEP frame -> UDB frame (board centre, board bottom at z=0, receptacle at +y), measured from that file, mm
 UDB_STEP_SHIFT = (-75.004, 64.793, 0.01)
 MM = 0.1
-ANGLES = {"typing_angle", "tent", "lower_cant"}
+DOC_NAME = "Alice Case v2"
+ANGLES = {"typing_angle", "tent", "lower_cant", "clip_lip_lead"}
 UNITLESS = {"stab_min_w"}
 
 
@@ -59,7 +64,7 @@ def add_params(design, P):
             flat[k] = v
     ups = design.userParameters
     for k, v in flat.items():
-        if isinstance(v, str):  # (crease_mode: a switch, not a length)
+        if not isinstance(v, (int, float)) or isinstance(v, bool):  # (crease_mode: a switch; v2: the clip_pts point lists)
             continue
         unit = "deg" if k in ANGLES else "" if k in UNITLESS else "mm"
         ups.add(k, adsk.core.ValueInput.createByString(f"{v} {unit}".strip()), unit, "from geometry.py (baked in)")
@@ -130,7 +135,8 @@ def appearance(name, rgb):
 
 
 def build_half(root, g, h):
-    """M2: plate, PCB (+ socket keep-outs, JST header and its plug pocket), switches, keycap envelopes, PCBsnaps."""
+    """M2: plate, PCB (+ socket keep-outs, JST header and its plug pocket), switches, keycap envelopes, and (v2) the
+    5 TPU C-clips on the PCB's edge, each shaped to its spot (build_clip: the spine fills the gap to the wall there)."""
     d, L, s = g["halves"][h], g["layers"], "L" if h == "left" else "R"
     asm = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     asm.component.name = "Left" if h == "left" else "Right"
@@ -144,13 +150,10 @@ def build_half(root, g, h):
         "switches": part(c, "Switches" + s, m, ("SwitchBottom", d["cutouts"], L["switch_bottom"]),
                          ("SwitchTop", d["switches"], L["switch_top"]), ctx=asm),
         "keycaps": part(c, "Keycaps" + s, m, ("KeyEnvelope", d["keycaps"], L["keycap"], False, 0.35), ctx=asm),
-        # M6: the Geon x Nuxros staple: top bar over the PCB, spine in the wall gap, legs under the PCB at each end
-        "snaps": part(c, "Snaps" + s, m, ("PCBsnapBar", [q["bar"] for q in d["snaps"]], L["snap_bar"]),
-                      ("PCBsnapSpine", [q["spine"] for q in d["snaps"]], L["snap_spine"]),
-                      ("PCBsnapLegs", [p_ for q in d["snaps"] for p_ in q["legs"]], L["snap_leg"]), ctx=asm),
     }
-    for b in occs["snaps"].component.bRepBodies:  # M5: easy to spot
-        b.appearance = appearance("PCBsnap orange", (255, 120, 0))
+    for q in d["clips"]:  # v2: q["matrix"] = the clip frame (x out from the PCB edge, y up the plate normal, z along the edge) -> world
+        occs[f"clip{q['name']}"] = build_clip(c, f"Clip{q['name']}{s}", q["matrix"], q["profile"], q["lattice"],
+                                              g["params"]["clip"]["len"], q["plan"], ctx=asm)
     return asm, occs
 
 
@@ -161,30 +164,69 @@ def build_udb(root, g):
                 ("USBReceptacle", [u["receptacle"]], u["receptacle_z"]))
 
 
-def build_tpu_snap(root, g):
-    """M6: a printable TPU stand-in for the Geon x Nuxros PCBsnap (prototyping; the bought silicone ones replace it):
-    the nominal staple as one watertight body, placed off the case, lying as it prints: the outer (wall) face of the
-    spine on the bed (z = 0), bar and end legs rising from it, the PCB slot and centre notch open upward (no
-    supports). x along the length, y across the height (PCB underside = 0), z = reach from the wall face. Print one per snap (8)."""
-    P, L = g["params"], g["layers"]
-    ln, reach, notch = P["snap"]
-    sp, pt, drop = P["snap_spine"], P["pcb_t"], P["snap_drop"]
-    bar = L["snap_bar"][1] - L["snap_bar"][0]
-    R = lambda x0, x1, y0, y1: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
-    x0 = min(p[0] for p in g["outline"]) - 40.0
-    occ = part(root, "PCBsnapTPU", [[1, 0, 0, x0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-               ("TPUSpine", [R(0, ln, -drop, pt + bar)], [0.0, sp]),
-               ("TPUBar", [R(0, ln, pt, pt + bar)], [sp, sp + reach]),
-               ("TPULegs", [R(0, (ln - notch) / 2, -drop, 0), R((ln + notch) / 2, ln, -drop, 0)], [sp, sp + reach]))
+def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None):
+    """v2: one TPU C-clip as one body in its own component. profile = the side view in the component's XY (x out from the
+    PCB edge toward the wall, y = height), extruded +- length / 2 along z (the edge); hexes = the lattice cells (z along
+    the edge, y height) cut through along x. plan = the clip's plan (x out, z along the edge; the recess outline less the
+    fit clearance): the profile prism is intersected with it (rounds the corners clear of the recess's R1.5 ones). Placed with matrix m."""
+    occ = parent.occurrences.addNewComponent(matrix(m))
     c = occ.component
-    bs = [c.bRepBodies.item(i) for i in range(c.bRepBodies.count)]
-    spine = next(b for b in bs if b.name == "TPUSpine")
-    cut(c, spine, [b for b in bs if b is not spine], op=adsk.fusion.FeatureOperations.JoinFeatureOperation)
-    c.bRepBodies.item(0).name = "PCBsnapTPU"
-    c.bRepBodies.item(0).appearance = appearance("PCBsnap orange", (255, 120, 0))
+    c.name = name
+    slab(c, name, [profile], [-length / 2, length / 2])
+    sp = c.sketches.add(c.xZConstructionPlane)
+    sp.name = "Plan"
+    sp.isComputeDeferred = True
+    pp = [sp.modelToSketchSpace(P3(x, 0, z)) for x, z in plan[:-1]]
+    for i in range(len(pp)):
+        sp.sketchCurves.sketchLines.addByTwoPoints(pp[i], pp[(i + 1) % len(pp)])
+    sp.isComputeDeferred = False
+    inp = c.features.extrudeFeatures.createInput(sp.profiles.item(0), adsk.fusion.FeatureOperations.IntersectFeatureOperation)
+    inp.setSymmetricExtent(adsk.core.ValueInput.createByString("40 mm"), True)
+    inp.participantBodies = [c.bRepBodies.item(0)]  # else it intersects EVERY body it touches in the design (shredded the plates and PCBs)
+    c.features.extrudeFeatures.add(inp).name = "PlanTrim"
+    sk = c.sketches.add(c.yZConstructionPlane)
+    sk.name = "Lattice"
+    sk.isComputeDeferred = True
+    lines = sk.sketchCurves.sketchLines
+    for hx in hexes:
+        pts = [sk.modelToSketchSpace(P3(0, w, a)) for a, w in hx]  # (model y = height, z = along the edge)
+        first = prev = None
+        for i in range(len(pts)):
+            a_ = prev.endSketchPoint if prev else pts[0]
+            b_ = first.startSketchPoint if i == len(pts) - 1 else pts[i + 1]
+            prev = lines.addByTwoPoints(a_, b_)
+            first = first or prev
+    sk.isComputeDeferred = False
+    coll = adsk.core.ObjectCollection.create()
+    for i in range(sk.profiles.count):
+        coll.add(sk.profiles.item(i))
+    inp = c.features.extrudeFeatures.createInput(coll, adsk.fusion.FeatureOperations.CutFeatureOperation)
+    inp.setSymmetricExtent(adsk.core.ValueInput.createByString("40 mm"), True)
+    inp.participantBodies = [c.bRepBodies.item(0)]  # only the clip
+    c.features.extrudeFeatures.add(inp).name = "LatticeCut"
     b = c.bRepBodies.item(0)
-    log(f"PCBsnapTPU: {c.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.1f} mm3, "
-        f"{ln} x {sp + reach} x {pt + bar + drop} mm, print on the spine's wall face (no supports); {sum(len(d['snaps']) for d in g['halves'].values())} needed")
+    b.name = name
+    b.appearance = appearance("TPU clip orange", (255, 120, 0))
+    return occ.createForAssemblyContext(ctx) if ctx else occ
+
+
+def build_tpu_clip(root, g):
+    """v2: the printable TPU C-clip itself, one watertight body "TpuClip", the nominal part (the fit bodies in the halves
+    take each spot's wall offsets): 10 long, slot 1.5 for the 1.6 PCB, 2.5 under it, a 1.0 lip 1.5 over it with a 30 deg
+    lead-in, a snap_gap (0.9) spine, a lattice (2.3 cells, 0.8 walls) in the ledge; ~6.5 high (the PCB's underside is
+    y = 0, the clip rises 2.5 above it and 4.0 below). Placed off the case, as it prints on its spine's outer face."""
+    P = g["params"]
+    q = g["halves"]["left"]["clips"][0]
+    wb = g["floor_w"] + P["floor_air"]  # the PCB underside plane
+    prof = [[x, w - wb] for x, w in q["profile"]]
+    prof[1][0] = prof[2][0] = P["snap_gap"]  # the spine: the PCB-to-wall gap at mid-PCB, straight
+    lat = [[[a, w - wb] for a, w in hx] for hx in q["lattice"]]
+    x0 = min(p[0] for p in g["outline"]) - 40.0
+    occ = build_clip(root, "TpuClip", [[1, 0, 0, x0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], prof, lat, P["clip"]["len"], q["plan"])
+    b = occ.component.bRepBodies.item(0)
+    log(f"TpuClip: {occ.component.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.1f} mm3, "
+        f"{P['clip']['len']} long x {max(p[1] for p in prof) - min(p[1] for p in prof):.1f} high x "
+        f"{max(p[0] for p in prof) - min(p[0] for p in prof):.1f} deep; {sum(len(d['clips']) for d in g['halves'].values())} needed")
     return occ
 
 
@@ -202,7 +244,37 @@ def import_udb_step(udb):
     return occ.createForAssemblyContext(udb)
 
 
+def check_volumes(g, halves, tol=0.02):
+    """v2: every flat placeholder's bodies must add up to the volume the JSON predicts (expect_vol, shapely union area x
+    thickness), within tol: a feature that touches more than its target shreds them (the plate bbox check alone only
+    sees the bbox). The TPU clips: 50 % .. 102 % of the nominal TpuClip."""
+    bad, n = [], 0
+    for h, (asm, occs) in halves.items():
+        tot = {}
+        for o in occs.values():
+            for b in o.component.bRepBodies:
+                k = b.name.rstrip("0123456789")
+                k = k[:-1] if k in ("PlateL", "PlateR", "PcbL", "PcbR") else k  # (the plate and PCB bodies carry the side)
+                tot[(o.component.name, k)] = tot.get((o.component.name, k), 0.0) + b.volume * 1000
+        for k, want in g["halves"][h]["expect_vol"].items():
+            got = sum(v for (cn, kk), v in tot.items() if kk == k)
+            n += 1
+            if abs(got - want) > tol * want:
+                bad.append(f"{h} {k}: {got:.1f} vs {want:.1f} mm3 ({(got / want - 1) * 100:+.1f} %)")
+            log(f"  volume {h} {k}: {got:.1f} mm3, JSON expects {want:.1f} ({(got / want - 1) * 100:+.2f} %)")
+        nom = None
+        for o in occs.values():
+            if o.component.name.startswith("Clip"):
+                v = o.component.bRepBodies.item(0).volume * 1000
+                nom = nom or max(x.component.bRepBodies.item(0).volume * 1000 for x in occs.values() if x.component.name.startswith("Clip"))
+                n += 1
+                if not 0.5 * nom <= v <= 1.02 * nom:
+                    bad.append(f"{h} {o.component.name}: {v:.1f} mm3 (clips run {nom:.1f} at most)")
+    log(f"CHECK placeholder volumes ({n} sums vs the JSON, +-{tol * 100:.0f} %): {len(bad)} off {bad} -> {'PASS' if not bad else 'FAIL'}")
+
+
 def check_m2(design, g, halves, udb):
+    check_volumes(g, halves)
     worst = 0.0
     for h, (asm, occs) in halves.items():
         d, plate_occ = g["halves"][h], occs["plate"]
@@ -237,7 +309,7 @@ def check_m2(design, g, halves, udb):
              for r in (res.item(i) for i in range(res.count))]
     cross = [p for p in pairs if p[0] != p[2]]
     inner = sorted({f"{p[1].rstrip('0123456789')}/{p[3].rstrip('0123456789')}" for p in pairs if p[0] == p[2]})
-    log(f"interference pairs inside one assembly (by design: snaps clip the PCB, switch tops sit in the keycap "
+    log(f"interference pairs inside one assembly (by design: the TPU clips grip the PCB, switch tops sit in the keycap "
         f"envelopes, the JST sits in its plug pocket): {len(pairs) - len(cross)}, kinds {inner}")
     log(f"CHECK interference between Left, Right and UDB: {len(cross)} pair(s) {cross} -> "
         f"{'PASS' if not cross else 'FAIL'}")
@@ -435,11 +507,71 @@ def band_recess(c, g):
     log(f"M7: band recess {P['panel_recess'][0]} mm on the panel's rear face (2 fields, USB frame)")
 
 
+def clip_recesses(c, g):
+    """v2: the 10 recesses for the TPU C-clips, cut from the Body's pocket floors. Per clip: the lead-in's outline (the
+    recess grown by its depth, mouth_ext_w: the recess's R1.5 rectangle, run 0.5 past the pocket wall) drawn on the floor
+    plane (a sketch on the floor face, as the opening chamfer is) and extruded 0.5 into the body with a 45 deg inward
+    taper, so its bottom is the recess; that tool is trimmed to the pocket's wall prism (so the wall side is the wall itself,
+    no undercut) and cut. Flat bottom parallel to the PCB, 3 open sides tapered 45 deg."""
+    P = g["params"]
+    rd, fw = P["clip_recess"][2], g["floor_w"]
+    ext = c.features.extrudeFeatures
+    B = c.bRepBodies.itemByName
+    hi = g["max_height"] + 20
+    many = lambda q: q if isinstance(q[0][0], list) else [q]
+    bad = []
+    for h in ("left", "right"):
+        X = h[0].upper()
+        m = g["halves"][h]["matrix"]
+        wall = slab(c, "ClipWall" + X, many(g["cavity_steps"]["floor"][h]["open"]), [1.0, hi + 5]).bodies.item(0)
+        for q in g["halves"][h]["clips"]:
+            try:
+                face = None  # (re-found each time: a cut renumbers the Body's faces)
+                for f in B("Body").faces:
+                    if f.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
+                        continue
+                    pt = f.pointOnFace
+                    nf = f.evaluator.getNormalAtPoint(pt)[1]
+                    if nf.x * m[0][2] + nf.y * m[1][2] + nf.z * m[2][2] > 0.99999 and abs(local_w(m, (pt.x, pt.y, pt.z)) - fw) < 0.01:
+                        face = f
+                        break
+                o, n = face.pointOnFace, face.evaluator.getNormalAtPoint(face.pointOnFace)[1]
+                zt = lambda x, y: o.z / MM - (n.x * (x - o.x / MM) + n.y * (y - o.y / MM)) / n.z
+                sk = c.sketches.addWithoutEdges(face)
+                sk.name = f"ClipMouth{X}{q['name']}"
+                sk.isComputeDeferred = True
+                pts = [sk.modelToSketchSpace(P3(x, y, zt(x, y))) for x, y in q["mouth_ext_w"]]
+                lines, prev, first = sk.sketchCurves.sketchLines, None, None
+                for i in range(len(pts)):
+                    a_ = prev.endSketchPoint if prev else pts[0]
+                    b_ = first.startSketchPoint if i == len(pts) - 1 else pts[i + 1]
+                    prev = lines.addByTwoPoints(a_, b_)
+                    first = first or prev
+                sk.isComputeDeferred = False
+                prof = max((sk.profiles.item(i) for i in range(sk.profiles.count)), key=lambda p_: p_.areaProperties().area)
+                inp = ext.createInput(prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+                inp.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByString(f"{rd} mm")),
+                                     adsk.fusion.ExtentDirections.NegativeExtentDirection, adsk.core.ValueInput.createByString("-45 deg"))
+                tool = ext.add(inp)
+                tool.name = f"ClipRecess{X}{q['name']}"
+                t = tool.bodies.item(0)
+                t.name = f"ClipRecess{X}{q['name']}"
+                cut(c, t, [wall], keep=True, op=adsk.fusion.FeatureOperations.IntersectFeatureOperation)
+                cut(c, B("Body"), [t])
+            except RuntimeError as e:
+                bad.append((h, q["name"], str(e)[:70]))
+        c.features.removeFeatures.add(wall)
+    log(f"v2: C-clip recesses {P['clip_recess'][0]} x {P['clip_recess'][1]} x {rd} mm with a 45 deg lead-in: "
+        f"{sum(len(d['clips']) for d in g['halves'].values()) - len(bad)} cut" + (f", FAILED {bad}" if bad else ""))
+
+
 def build_case(root, g):
     """M3: Body = outline prism below both top planes, minus the two pockets (opening prism above its floor plane),
     the rabbet, the bottom cavity (ceiling cut to the pocket-floor planes, since it runs under the bezels and the
-    web), the UDB bay, the USB slot (bay-wide, through the rear face) and the insert holes. Panel = panel outline minus foot pockets and countersunk
-    holes, plus the UDB bosses with M2 pilots. Tool bodies are kept (hidden) for the wall check."""
+    web), the UDB bay, the USB slot (v2: a 22 wide chamber, then a 17 wide neck through the rear face) and the insert
+    holes; v2: the C-clip recesses in the pocket floors, 4 bumpon recesses in the underside, the rear peak cut by one
+    plane. Panel = panel outline minus countersunk holes and the recessed field (0.6 deep, 0.4 under the screw heads),
+    plus the UDB bosses with M2 pilots. Tool bodies are kept (hidden) for the wall check."""
     P, L = g["params"], g["layers"]
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     c = occ.component
@@ -460,9 +592,9 @@ def build_case(root, g):
         for i in range(gr.bodies.count):
             gr.bodies.item(i).name = f"Groove{X}{i}"
         for i, q in enumerate(q_ for q_ in cs["islands"] if q_["half"] == h):
-            # M6: a boss's flat top is made by a trim cut like the pillars' (prism 0.5 higher, then cut down to its
-            # top): a prism cap meeting the wall at a fillet tangent left zero-area triangles no tool reaches
-            zz = q["z"] if q["kind"].startswith("pillar") else [q["z"][0], q["z"][1] + 0.5]
+            # M6: a boss's flat top is made by a trim cut (prism 0.5 higher, then cut down to its top): a prism cap
+            # meeting the wall at a fillet tangent left zero-area triangles no tool reaches
+            zz = [q["z"][0], q["z"][1] + 0.5]
             one(f"Island{X}{i}", many(q["join"]), zz).name = f"Island{X}{i}"
             alt = one(f"IslandAlt{X}{i}", many(q["join_alt"]), zz)  # fallback if the cut fails
             alt.name, alt.isLightBulbOn = f"IslandAlt{X}{i}", False  # (named even when its sketch gave 2 profiles)
@@ -491,27 +623,6 @@ def build_case(root, g):
     cut(c, panel, [one("LipNotch", [g["notch"]], [P["panel_t"], g["lip_z"][1] + 1])])
     lip_pocket = one("LipPocket", [g["lip_pocket"]], g["lip_pocket_z"])
     cut(c, lip_pocket, lip_ramps(c, g, P["panel_gap_print"], g["rear_zone_body"]))
-    feet = slab(c, "FootPockets", g["feet"], [-1.0, P["foot_depth"]])
-    feet_bodies = [feet.bodies.item(i) for i in range(feet.bodies.count)]
-    # M6: removable press-fit TPU feet: a pad below the panel and a plug foot_fit oversize in the pocket, one body each
-    foot = slab(c, "Foot", g["feet"], [-P["foot_proud"], 0.0], opacity=None)
-    plug = slab(c, "FootPlug", g["feet_plug"], [0.0, P["foot_depth"]], opacity=None)
-    # M6: two press-fit pegs per foot (foot_fit oversize, 0.1 short of the hole's top) into Ø3 holes through the panel
-    pd_, ph_ = P["foot_peg"][0], P["foot_peg"][1]
-    pegs = slab(c, "FootPeg", g["pegs"], [P["foot_depth"] - 0.01, P["foot_depth"] + ph_ - 0.1], opacity=None)
-    peg_holes = slab(c, "FootPegHole", g["peg_holes"], [P["foot_depth"] - 0.01, P["foot_depth"] + ph_ + 0.01])
-    peg_hole_bodies = [peg_holes.bodies.item(i) for i in range(peg_holes.bodies.count)]
-    ctr_ = lambda b: ((b.boundingBox.minPoint.x + b.boundingBox.maxPoint.x) / 2, (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2)
-    plugs = [plug.bodies.item(i) for i in range(plug.bodies.count)]
-    pegs_ = [pegs.bodies.item(i) for i in range(pegs.bodies.count)]
-    for b in [foot.bodies.item(i) for i in range(foot.bodies.count)]:
-        pc = min(plugs, key=lambda p_: math.dist(ctr_(p_), ctr_(b)))
-        plugs.remove(pc)
-        mine = sorted(pegs_, key=lambda p_: math.dist(ctr_(p_), ctr_(b)))[:2]
-        for p_ in mine:
-            pegs_.remove(p_)
-        cut(c, b, [pc] + mine, op=adsk.fusion.FeatureOperations.JoinFeatureOperation)
-
     # round and tilted tools: one base feature of temporary bodies
     tbm = adsk.fusion.TemporaryBRepManager.get()
     fw = g["floor_w"]
@@ -519,22 +630,19 @@ def build_case(root, g):
     for h, s_ in (("left", "L"), ("right", "R")):
         m = g["halves"][h]["matrix"]
         tmp["Top" + s_] = tbm.createBox(half_box(m, P["lip"], P["lip"] + 150))
-        wt = g["layers"]["pcb"][0] - P["pillar"][2]  # M5: snap pillar tops, parallel to the PCB
-        tmp["PillarAbove" + s_] = tbm.createBox(half_box(m, wt, wt + 150))
         f_ = g["cavity_steps"]["floor"][h]  # M6: below the groove plane; the shelf between it and the floor plane
         tmp["BelowGroove" + s_] = tbm.createBox(half_box(m, f_["groove_w"][0] - 150, f_["groove_w"][0]))
         tmp["ShelfBox" + s_] = tbm.createBox(half_box(m, f_["groove_w"][0] - 1.0, f_["w"]))
     for h in ("left", "right"):  # M6: the boss top trims (above)
         for i, q in enumerate(q_ for q_ in g["cavity_steps"]["islands"] if q_["half"] == h):
-            if not q["kind"].startswith("pillar"):
-                xs, ys = [p[0] for p in q["join"]], [p[1] for p in q["join"]]
-                tmp[f"BossAbove{h[0].upper()}{i}"] = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
-                    P3((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, q["z"][1] + 25), adsk.core.Vector3D.create(1, 0, 0),
-                    adsk.core.Vector3D.create(0, 1, 0), (max(xs) - min(xs) + 2) * MM, (max(ys) - min(ys) + 2) * MM, 50 * MM))
+            xs, ys = [p[0] for p in q["join"]], [p[1] for p in q["join"]]
+            tmp[f"BossAbove{h[0].upper()}{i}"] = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
+                P3((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, q["z"][1] + 25), adsk.core.Vector3D.create(1, 0, 0),
+                adsk.core.Vector3D.create(0, 1, 0), (max(xs) - min(xs) + 2) * MM, (max(ys) - min(ys) + 2) * MM, 50 * MM))
     rh, rc, (di, dd) = P["screw_head"] / 2, P["screw_clear"] / 2, P["insert_hole"]
     cyl = lambda a, ra, b, rb: tbm.createCylinderOrCone(a, ra * MM, b, rb * MM)  # radii in mm
     for i, (x, y) in enumerate(g["screws"]):
-        z0 = P["panel_recess"][0]  # M7: every screw sits in the panel's recessed field (the head seats on its floor)
+        z0 = P["screw_seat"][0]  # v2: every screw sits on its 0.4 deep seat pad in the recessed field (the head seats on it)
         d_ = g["insert_depths"][i]  # M7: per screw (short where the pocket floor is low over it)
         tmp[f"Insert{i + 1}"] = cyl(P3(x, y, P["panel_t"] - 0.01), di / 2, P3(x, y, P["panel_t"] + d_), di / 2)
         cs = cyl(P3(x, y, z0 - 0.01), rh + 0.01, P3(x, y, z0 + rh - rc), rc)
@@ -554,6 +662,14 @@ def build_case(root, g):
         adsk.core.Vector3D.create(0, 1, 0), (max(bx) - min(bx)) * MM, (max(by) - min(by)) * MM, (z1 - z0) * MM))
     for i, t in enumerate(lower_band_tools(tbm, g["lower_band"])):
         tmp[f"Lean{i + 1}"] = t
+    # v2 bumpon recesses (3M SJ5302 locating pockets in the underside)
+    for i, b_ in enumerate(g["bumpons"]):
+        tmp[f"Bumpon{i + 1}"] = cyl(P3(b_["x"], b_["y"], -1.0), b_["d"] / 2, P3(b_["x"], b_["y"], b_["depth"]), b_["d"] / 2)
+    # v2 rear peak: everything above the one plane through the rear-face line at BC and the crest point A
+    p0_, p1_, pa_ = g["rear_cut"]["points"]
+    nrm_ = cross([p1_[i] - p0_[i] for i in range(3)], [pa_[i] - p0_[i] for i in range(3)])
+    nrm_ = [v / math.sqrt(sum(w * w for w in nrm_)) * (1 if nrm_[2] > 0 else -1) for v in nrm_]  # up
+    tmp["RearCut"] = halfspace(tbm, pa_, nrm_)
     bf = c.features.baseFeatures.add()
     bf.name = "CaseTools"
     bf.startEdit()
@@ -562,7 +678,7 @@ def build_case(root, g):
     bf.finishEdit()
     B = c.bRepBodies.itemByName
     # M6 floor: Open less everything under the groove plane, less the shelf (groove plane .. floor plane, run into the
-    # wall, grooves taken out), less the islands (each pillar trimmed to its PCB-parallel plane)
+    # wall, grooves taken out), less the islands (each boss trimmed to its flat top)
     Inter = adsk.fusion.FeatureOperations.IntersectFeatureOperation
     for h, f in g["cavity_steps"]["floor"].items():
         X = h[0].upper()
@@ -572,7 +688,7 @@ def build_case(root, g):
             cut(c, B("ShelfBox" + X), grs)
         qs = [q_ for q_ in g["cavity_steps"]["islands"] if q_["half"] == h]
         for i, q in enumerate(qs):
-            above_ = B("PillarAbove" + X) if q["kind"].startswith("pillar") else B(f"BossAbove{X}{i}")
+            above_ = B(f"BossAbove{X}{i}")
             for nm in (f"Island{X}{i}", f"IslandAlt{X}{i}"):
                 cut(c, B(nm), [above_], keep=True)
         for t_ in [B("BelowGroove" + X), B("ShelfBox" + X)]:
@@ -606,7 +722,10 @@ def build_case(root, g):
             for a, b in (ends, ends[::-1]):
                 if near(a, cp) and not any(near(b, o) for o in creases):
                     redges.append(e)
-    edge_round(c, redges, P["outer_r"], chain=False)
+    # v2: the lean edges (~7 mm) meet the tall vertical ones at the crease: one fillet op fails there, tall edges first work
+    toks = [[e.entityToken for e in redges if (e.length > 2.0) == tall] for tall in (True, False)]
+    for ts in toks:  # (edge objects go stale after the first op: re-find them by token)
+        edge_round(c, [c.parentDesign.findEntityByToken(t)[0] for t in ts], P["outer_r"], chain=False)
     log(f"M4: lower band cut ({len(lean)} lean planes), R{P['outer_r']} on {len(redges)} corner edges")
     body = B("Body")
     outer = c.features.copyPasteBodies.add(body).bodies.item(0)  # the styled outside, for the wall check
@@ -675,37 +794,56 @@ def build_case(root, g):
     log(f"M4: R{P['top_round']} top round ({len(rim_edges)} edges), {P['opening_chamfer']} mm x 45 deg opening "
         f"chamfer on {len(g['chamfer_top'])} openings")
     panel = B("Panel")
-    # M7: feet (and any peg hole) whose centre lies on the panel go into it, the rest into the body's underside
-    def inside(pt, ring):  # even-odd ray cast
-        x, y, c_ = pt[0], pt[1], False
-        for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
-            if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
-                c_ = not c_
-        return c_
-    ctr = lambda b: ((b.boundingBox.minPoint.x + b.boundingBox.maxPoint.x) / 2 / MM, (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2 / MM)
-    on_panel = lambda b: inside(ctr(b), g["panel_lean"])
-    rear_ = [b for b in feet_bodies + peg_hole_bodies if on_panel(b)]
-    front_ = [b for b in feet_bodies + peg_hole_bodies if not on_panel(b)]
-    cut(c, panel, rear_ + [B(f"Countersink{i + 1}") for i in range(len(g["screws"]))])
-    if front_:
-        cut(c, B("Body"), front_)
-    # M7: the shallow recessed field on the panel's outer face (clear of the countersinks and the rear feet)
-    cut(c, B("Panel"), [one("PanelRecess", [g["panel_recess"]], [-1.0, P["panel_recess"][0]])])
+    cut(c, panel, [B(f"Countersink{i + 1}") for i in range(len(g["screws"]))])
+    # v2: the shallow recessed field on the panel's outer face: screw_seat deep all over it (the seat pad round each screw
+    # is what is left of that), then panel_recess[0] deep where the pads are not (R3 corners: the Ø6 flat end mill)
+    for nm, key, zmax in (("PanelRecess", "panel_recess", P["screw_seat"][0]), ("PanelRecessDeep", "panel_recess_deep", P["panel_recess"][0])):
+        f_ = slab(c, nm, many(g[key]), [-1.0, zmax])
+        cut(c, B("Panel"), [f_.bodies.item(i) for i in range(f_.bodies.count)])
     band_recess(c, g)
-    log(f"M7: feet pockets and peg holes: {len(rear_)} in the panel, {len(front_)} in the body")
+    clip_recesses(c, g)
+    cut(c, B("Body"), [B(f"Bumpon{i + 1}") for i in range(len(g["bumpons"]))])
+    log(f"v2: {len(g['bumpons'])} bumpon recesses Ø{P['bumpon']['recess_d']} x {P['bumpon']['recess_depth']}, panel field "
+        f"{P['panel_recess'][0]} deep with {P['screw_seat'][0]} seat pads")
     # USB slot corners: the edges along Y at the slot's sides, roof (body) and floor (panel top, in the lip)
+    # v2: R3 on the neck edges (2.7 mm long) left 0.24 mm3 of roof fillet in the board's way: trimmed back below
     nx = [p[0] for p in g["notch"]]
-    def slot_edges(b, z):
+    nk = [g["ridge_x"] - P["usb_neck"][0] / 2, g["ridge_x"] + P["usb_neck"][0] / 2]
+    def slot_edges(b, z, xs):
         out = []
         for e in b.edges:
             a, q = e.startVertex.geometry, e.endVertex.geometry
             if abs(a.x - q.x) < 1e-5 and abs(a.z - q.z) < 1e-5 and abs(a.z / MM - z) < 1e-3 and \
-                    min(abs(a.x / MM - x) for x in (min(nx), max(nx))) < 1e-3 and abs(a.y - q.y) > 1e-4:
+                    min(abs(a.x / MM - x) for x in xs) < 1e-3 and abs(a.y - q.y) > 1e-4:
                 out.append(e)
         return out
-    roof, floor = slot_edges(B("Body"), g["notch_z"][1]), slot_edges(B("Panel"), P["panel_t"])
-    edge_round(c, roof, P["usb_r"][0], chain=False)
-    edge_round(c, floor, P["usb_r"][1], chain=False)
+    # v2 (user): the visible neck gets its R3 roof corners back (the round seen from behind, as in v1). The fillet runs the
+    # neck's whole length, so its inner 0.75 mm (from the step into the chamber's side) is cut away again below: the
+    # fillet never comes within 1.0 mm of the board's rear edge, which sits 0.25 mm behind the step
+    roof, floor = slot_edges(B("Body"), g["notch_z"][1], (min(nx), max(nx)) + tuple(nk)), slot_edges(B("Panel"), P["panel_t"], nk + [min(nx), max(nx)])
+    for nm_, es_, r_ in (("roof", roof, P["usb_r"][0]), ("floor", floor, P["usb_r"][1])):
+        try:
+            edge_round(c, es_, r_, chain=False)
+        except RuntimeError as e:  # v2: the neck's edges end at the step into the chamber; log rather than lose the build
+            log(f"BUILD WARNING: USB slot {nm_} R{r_} on {len(es_)} edges failed ({str(e)[:70]})")
+    # trim the neck's roof fillet back from the step (see above). Fusion's fillet end runs ~1.3 mm back past the step into the
+    # chamber (measured: 0.2 mm3 in the board's way at y step - 1.27 .. step - 0.5, x up to 8.73 from the ridge), so two boxes
+    # go from the chamber's void (2 mm behind the step) up to the roof plane, from under the fillet: A the neck wide (to
+    # 0.75 mm in front of the step), B 18 wide (the board's width) but only to 0.2 mm behind the step, where the chamber's
+    # corner arcs are still clear of it (the arc wall is at >= 0.04 behind the step)
+    y_step = g["udb"]["pad"]["y"][1] + 0.5
+    zr_ = g["notch_z"][1]
+    for nm_, hw_, y0_, y1_ in (("NeckRoundTrimA", P["usb_neck"][0] / 2, y_step - 2.0, y_step + 0.75),
+                               ("NeckRoundTrimB", P["udb"][0] / 2, y_step - 2.0, y_step - 0.2)):
+        trim = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
+            P3(g["ridge_x"], (y0_ + y1_) / 2, zr_ - P["usb_r"][0] / 2 - 0.25), adsk.core.Vector3D.create(1, 0, 0),
+            adsk.core.Vector3D.create(0, 1, 0), 2 * hw_ * MM, (y1_ - y0_) * MM, (P["usb_r"][0] + 0.5) * MM))
+        bf3 = c.features.baseFeatures.add()
+        bf3.name = nm_
+        bf3.startEdit()
+        c.bRepBodies.add(trim, bf3).name = nm_
+        bf3.finishEdit()
+        cut(c, B("Body"), [B(nm_)])
     # M5 UDB rest pad on the slot roof, trimmed by the roof corners' Ø6 ball paths (so both stay machinable from below)
     pd_ = g["udb"]["pad"]
     (px0, px1), (py0, py1), (pz0, pz1) = pd_["x"], pd_["y"], pd_["z"]
@@ -723,6 +861,12 @@ def build_case(root, g):
     bf2.finishEdit()
     cut(c, B("Body"), [B("UdbRestPad")], op=adsk.fusion.FeatureOperations.JoinFeatureOperation)
     log(f"M4: USB slot corners R{P['usb_r'][0]} roof ({len(roof)} edges), R{P['usb_r'][1]} floor ({len(floor)} edges)")
+    # v2: the rear peak, last (the top round and the opening chamfer are on the two facets): the cut face is plain; the
+    # opening edges the plane meets (the pockets under it) stay sharp, as does its edge with the facets
+    cut(c, B("Body"), [B("RearCut")])
+    rc_ = g["rear_cut"]
+    log(f"v2: rear peak cut: plane through A ({rc_['A'][0]:.2f}, {rc_['A'][1]:.2f}, {rc_['A'][2]:.2f}) and the rear-face line at z "
+        f"{rc_['bc']:.2f} (BC), triangle {rc_['face'][0]:.1f} x {rc_['face'][1]:.1f}")
     body, panel = B("Body"), B("Panel")
     log(f"Case: Body {body.volume * 1000:.0f} mm3, {body.faces.count} faces; Panel {panel.volume * 1000:.0f} mm3, "
         f"{panel.faces.count} faces; bodies {[b.name for b in c.bRepBodies]}")
@@ -753,25 +897,21 @@ def check_m3(design, g, halves, udb, case):
     log(f"CHECK interference, case Body + Panel vs {nplace} placeholder bodies + UDB: {len(hits)} pair(s) {hits[:20]} -> "
         f"{'PASS' if not hits else 'FAIL'}")
 
-    # snap gap: from the PCB edge under each snap's centre, at PCB mid-thickness, to the case Body
-    worst = 0.0
+    # v2 PCB-to-wall gap: from the PCB edge at each C-clip's centre, at the PCB's underside, mid and top, to the case Body: at
+    # least pcb_wall_min (0.80) at all three; the pocket is vertical and the PCB tilted, so it is 0.8 .. 1.3 over the clips
+    worst = 9.0
     for h, (asm, occs) in halves.items():
         d, M = g["halves"][h], g["halves"][h]["matrix"]
-        pocc = occs["pcb"]
-        pcb = pocc.component.bRepBodies.itemByName("Pcb" + h[0].upper()).createForAssemblyContext(pocc)
-        for q in d["snaps"]:
-            ux, uy = q["edge_mid"]
+        for q in d["clips"]:
+            ux, uy = q["edge_pt"]
             gaps = []
             for w in (g["pcb_mid_w"] - P["pcb_t"] / 2, g["pcb_mid_w"], g["pcb_mid_w"] + P["pcb_t"] / 2):
                 X, Y, Z = (sum(M[r][k] * v for k, v in enumerate((ux, uy, w))) + M[r][3] for r in range(3))
-                pt = P3(X, Y, Z)
-                on_pcb = mm(pt, pcb)
-                gaps.append(mm(pt, body))
-            worst = max(worst, abs(gaps[1] - P["snap_gap"]))
-            log(f"  snap {h} {q['side']}: gap bottom/mid/top {gaps[0]:.3f} / {gaps[1]:.3f} / {gaps[2]:.3f} mm "
-                f"(point on the PCB within {on_pcb:.4f} mm)")
-    ok["snap"] = worst <= 0.05
-    log(f"CHECK snap gap at PCB mid-thickness {P['snap_gap']} +- 0.05: worst off by {worst:.3f} mm -> {'PASS' if ok['snap'] else 'FAIL'}")
+                gaps.append(mm(P3(X, Y, Z), body))
+            worst = min(worst, min(gaps))
+            log(f"  clip {h} {q['name']}: PCB-to-wall gap bottom/mid/top {gaps[0]:.3f} / {gaps[1]:.3f} / {gaps[2]:.3f} mm")
+    ok["pcb_gap"] = worst >= P["pcb_wall_min"] - 0.02
+    log(f"CHECK PCB-to-wall gap at the clips >= {P['pcb_wall_min']} (-0.02): smallest {worst:.3f} mm -> {'PASS' if ok['pcb_gap'] else 'FAIL'}")
 
     # USB opening (notch faces in the body) vs the receptacle box
     rec = udb.component.bRepBodies.itemByName("USBReceptacle").createForAssemblyContext(udb).boundingBox
@@ -788,8 +928,17 @@ def check_m3(design, g, halves, udb, case):
     zb = P["panel_t"]  # the notch is open to the bottom: its lower edge is the panel seam
     oc = ((xl + xr) / 2, (zb + zt) / 2)
     dev = ((oc[0] - rcx) ** 2 + (oc[1] - rcz) ** 2) ** 0.5
-    ok["usb"] = dev <= 0.2
-    log(f"CHECK USB opening {xr - xl:.2f} x {zt - zb:.2f} mm, centre ({oc[0]:.3f}, z {oc[1]:.3f}) "
+    # v2: stepped: the chamber (usb_slot_w wide, probed above) and the neck through the rear face (usb_neck[0] wide, probed 1 mm
+    # behind the step, above the band's top, below the roof's R3 corners); the step's depth is the geometry test's
+    try:
+        y_neck, z_neck = g["udb"]["pad"]["y"][1] + 0.5 + 1.0, g["lip_z"][1] + P["panel_gap_print"] + 0.3
+        nl_, nr_ = edge(lambda x: inside(x, z_neck, y_neck), rcx, rcx - 15), edge(lambda x: inside(x, z_neck, y_neck), rcx, rcx + 15)
+        neck_w = nr_ - nl_
+    except StopIteration:
+        neck_w = -1.0
+    ok["usb"] = dev <= 0.2 and abs(neck_w - P["usb_neck"][0]) <= 0.05 and abs((xr - xl) - P["usb_slot_w"]) <= 0.05
+    log(f"CHECK USB opening: chamber {xr - xl:.2f} (want {P['usb_slot_w']}) x {zt - zb:.2f} mm, neck {neck_w:.2f} (want {P['usb_neck'][0]}) "
+        f"x {P['usb_neck'][1]} deep; centre ({oc[0]:.3f}, z {oc[1]:.3f}) "
         f"vs receptacle ({rcx:.3f}, z {rcz:.3f}): {dev:.3f} mm -> {'PASS' if ok['usb'] else 'FAIL'}")
 
     # walls: min distance between each kept void tool and the outside of the outline, the two pockets, and
@@ -826,33 +975,40 @@ def check_m3(design, g, halves, udb, case):
     ok["lip"] = len(lips) == 10 and max(abs(v - P["lip"]) for v in lips) <= 0.05
     log(f"CHECK bezel top over the plate top along the normal (4 corners + centre per half): "
         f"{min(lips):.3f} .. {max(lips):.3f} mm (lip {P['lip']}) -> {'PASS' if ok['lip'] else 'FAIL'}")
-    # M5 snap pillars: each top parallel to its half's PCB (normal within 0.1 deg) and the same gap to the PCB
-    # underside at 4 points spread over it (within 0.05 mm), = pillar[2]
-    vis_ = {b.name: b.isLightBulbOn for b in c.bRepBodies}
-    for b in c.bRepBodies:
-        b.isLightBulbOn = b.name == "Body"
-    worst_a, worst_g, n_p = 0.0, 0.0, 0
-    for q in [q_ for q_ in g["cavity_steps"]["islands"] if q_["kind"].startswith("pillar")]:
-        M = g["halves"][q["half"]]["matrix"]
-        nrm = (M[0][2], M[1][2], M[2][2])
-        ring = q["poly"]
-        pts = [tuple(p) for p in q["probes"]]
-        gaps = []
-        for x, y in pts:
-            hp = adsk.core.ObjectCollection.create()
-            fs = c.findBRepUsingRay(P3(x, y, q["z_high"] + 1), adsk.core.Vector3D.create(0, 0, -1),
-                                    adsk.fusion.BRepEntityTypes.BRepFaceEntityType, 1e-5, True, hp)
-            f_, h_ = fs.item(0), hp.item(0)
-            n_ = f_.evaluator.getNormalAtPoint(h_)[1]
-            worst_a = max(worst_a, math.degrees(math.acos(min(1.0, n_.x * nrm[0] + n_.y * nrm[1] + n_.z * nrm[2]))))
-            gaps.append(g["layers"]["pcb"][0] - local_w(M, (h_.x, h_.y, h_.z)))
-        worst_g = max(worst_g, max(gaps) - min(gaps), max(abs(v - P["pillar"][2]) for v in gaps))
-        n_p += 1
-    for b in c.bRepBodies:
-        b.isLightBulbOn = vis_[b.name]
-    ok["pillars"] = n_p == sum(len(d["snaps"]) for d in g["halves"].values()) and worst_a <= 0.1 and worst_g <= 0.05
-    log(f"CHECK snap pillar tops ({n_p}): parallel to the PCB within {worst_a:.4f} deg, gap to the PCB underside "
-        f"{P['pillar'][2]} mm +- {worst_g:.4f} at 4 points each -> {'PASS' if ok['pillars'] else 'FAIL'}")
+    # v2 recess fit (replaces the snap pillar tops): each of the 10 clip bodies sits in its recess: no interference with the
+    # Body (the interference check above lists them by name: the spine stands 0.1 off the wall, the sides are free), the bottom
+    # on the recess floor (distance 0), and under it >= clip_floor_min - recess depth of Body down to the underside, i.e. the
+    # floor plane there is >= clip_floor_min above the desk (the local exception to base_min)
+    IN_ = adsk.fusion.PointContainment.PointInsidePointContainment
+    worst_d, worst_t, n_c = 0.0, 99.0, 0
+    for h, (asm, occs) in halves.items():
+        M = g["halves"][h]["matrix"]
+        for q in g["halves"][h]["clips"]:
+            occ = occs[f"clip{q['name']}"]
+            cb = occ.component.bRepBodies.item(0).createForAssemblyContext(occ)
+            worst_d = max(worst_d, mm(cb, body))
+            # the recess bottom's world point under the clip's ledge middle: edge point 1 mm inboard, w = floor - depth
+            ex, ey = q["edge_pt"]
+            nx_, ny_ = q["n"]
+            u_, v_ = ex - nx_ * 1.0, ey - ny_ * 1.0
+            wb_ = g["floor_w"] - P["clip_recess"][2]
+            X, Y, Z = (sum(M[r][k] * v for k, v in enumerate((u_, v_, wb_))) + M[r][3] for r in range(3))
+            z, ins = Z - 0.02, lambda zz: body.pointContainment(P3(X, Y, zz)) == IN_
+            if ins(z):
+                while ins(z - 0.25) and z > Z - 12:
+                    z -= 0.25
+                lo, hi_ = z - 0.25, z  # (lo: air or deeper, hi_: Body)
+                while hi_ - lo > 0.01:
+                    mid_ = (lo + hi_) / 2
+                    lo, hi_ = (lo, mid_) if ins(mid_) else (mid_, hi_)
+                worst_t = min(worst_t, Z - (lo + hi_) / 2)
+            else:
+                worst_t = 0.0
+            n_c += 1
+    ok["clip_fit"] = n_c == 10 and worst_d <= 0.02 and worst_t >= P["clip_floor_min"] - P["clip_recess"][2] - 0.02
+    log(f"CHECK C-clip recess fit ({n_c} clips): bottoms {worst_d:.4f} mm off the recess floors (want 0), Body under the recess "
+        f"floor >= {worst_t:.2f} mm (want >= {P['clip_floor_min'] - P['clip_recess'][2]}, i.e. the floor plane >= {P['clip_floor_min']} above the desk) "
+        f"-> {'PASS' if ok['clip_fit'] else 'FAIL'}")
     # M5: >= 3 mm of floor over the cable channels (the breakthroughs round the JSTs are the intended openings)
     chans = [T(b.name) for b in c.bRepBodies if b.name.startswith("Cavity")]
     fc = min(mm(a, q) for a in chans for q in POCK)
@@ -915,7 +1071,7 @@ def check_m3(design, g, halves, udb, case):
         f"material over / outside each insert {walls_udb:.2f} mm (to the cavity: geometry test) -> "
         f"{'PASS' if ok['udb_standoffs'] and ok['udb_insert_wall'] else 'FAIL'}")
     for b in c.bRepBodies:  # the kept tools
-        b.isLightBulbOn = b.name in ("Body", "Panel") or b.name.startswith("Foot")
+        b.isLightBulbOn = b.name in ("Body", "Panel")
     return ok
 
 
@@ -980,8 +1136,12 @@ def check_m4(g, case):
     for f in lean_faces.values():
         angles.append(math.degrees(math.asin(-f.evaluator.getNormalAtPoint(f.pointOnFace)[1].z)))
     # every face that leans in, anywhere on the body, must be one of these planes or a corner blend
+    # (v2: not the faces inside the USB chamber: its roof fillets / corner blends face down by construction, and which of
+    # their points pointOnFace picks decides whether their normal lies in the band)
+    in_slot = lambda f: f.boundingBox.minPoint.x / MM >= g["ridge_x"] - P["usb_slot_w"] / 2 - 0.1 and \
+        f.boundingBox.maxPoint.x / MM <= g["ridge_x"] + P["usb_slot_w"] / 2 + 0.1 and f.boundingBox.maxPoint.z / MM <= g["notch_z"][1] + 0.05
     strays = [f for f in body.faces if f.tempId not in lean_faces and f.tempId not in blends
-              and -0.5 < nz(f, f.pointOnFace) < -0.01]
+              and -0.5 < nz(f, f.pointOnFace) < -0.01 and not in_slot(f)]
     # one plane per ring edge, less the collinear ones (a horizontal crease makes the back one plane)
     n_ring = len({tuple(round(v, 6) for v in n_) for n_ in g["lower_band"]["normals"]})
     ok_l = len(lean_faces) == n_ring and all(abs(a - P["lower_cant"]) <= 1 for a in angles) and not strays
@@ -1008,21 +1168,84 @@ def check_m4(g, case):
     IN = adsk.fusion.PointContainment.PointInsidePointContainment
     ys = [p[1] for p in g["outline"]]
     n_w, bad_w = 0, []
+    cut_tri = g["rear_cut"]["plan"]  # v2: the rear peak's plane replaces the facets there
     for xi in range(int(2 * wb_) + 1):
         x = r_ - wb_ + xi
         for yi in range(int(max(ys) - min(ys)) + 1):
             y = min(ys) + yi
-            if not inside(x, y, g["outline"]) or any(inside(x, y, o_) for o_ in ops_) or \
-                    min([d_edge(x, y, g["outline"])] + [d_edge(x, y, o_) for o_ in ops_]) < 2.0:
+            if not inside(x, y, g["outline"]) or any(inside(x, y, o_) for o_ in ops_) or inside(x, y, cut_tri) or \
+                    min([d_edge(x, y, g["outline"])] + [d_edge(x, y, o_) for o_ in ops_] + [d_edge(x, y, cut_tri)]) < 2.0:
                 continue
             n_w += 1
             z = ztop(x * MM, y * MM) / MM
             if body.pointContainment(P3(x, y, z - 0.02)) != IN or body.pointContainment(P3(x, y, z + 0.02)) == IN:
                 bad_w.append((x, y))
     ok_w = n_w > 50 and not bad_w
-    log(f"CHECK web top flush with the top facets ({P['web_mode']} web): {n_w} probes, {len(bad_w)} off "
+    log(f"CHECK web top flush with the top facets ({P['web_mode']} web, outside the rear cut's triangle): {n_w} probes, {len(bad_w)} off "
         f"{bad_w[:5]} -> {'PASS' if ok_w else 'FAIL'}")
-    return {"crease": ok_c, "lower_band": ok_l, "web_flush": ok_w}
+    return {"crease": ok_c, "lower_band": ok_l, "web_flush": ok_w, **check_rear_cut(g, case)}
+
+
+def check_rear_cut(g, case):
+    """v2 rear peak: the Body's top over the cut triangle is the one plane (probed at 7 points of the triangle: body 0.02 under
+    the plane, air 0.02 over); BC (the rear face's top line) and A (the crest point) are where the JSON says (body
+    0.02 under, air 0.02 over); the cut triangle >= 6 mm from the pockets (geometry); the cut stays blind to the UDB bay
+    (>= 5 mm of body over its top corners); the rear face keeps ~25.6 mm over the USB slot (measured outside the neck)."""
+    P, c = g["params"], case.component
+    rc = g["rear_cut"]
+    body = c.bRepBodies.itemByName("Body")
+    IN = adsk.fusion.PointContainment.PointInsidePointContainment
+    zp = lambda x, y: rc["bc"] + rc["k"] * (y - rc["y_rear"])
+
+    tri = rc["plan"]
+    ops_ = g["opening"] if isinstance(g["opening"][0][0], list) else [g["opening"]]
+
+    def pip(x, y, ring):
+        c_ = False
+        for (ax, ay), (bx, by) in zip(ring, ring[1:] + ring[:1]):
+            if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+                c_ = not c_
+        return c_
+    # probes: a 4 mm grid over the triangle, off the pockets (over a pocket there is no Body at the plane: the wall over the
+    # pockets is the geometry test's number), up to 9 of them spread over it
+    cand = [(x, y) for x in range(int(min(p[0] for p in tri)), int(max(p[0] for p in tri)), 4)
+            for y in range(int(min(p[1] for p in tri)), int(max(p[1] for p in tri)), 4)
+            if pip(x, y, tri) and not any(pip(x, y, o_) for o_ in ops_)]
+    pts = cand[::max(1, len(cand) // 9)][:9]
+    dev = []
+    for x, y in pts:
+        z0 = zp(x, y)
+        if body.pointContainment(P3(x, y, z0 - 0.02)) == IN and body.pointContainment(P3(x, y, z0 + 0.02)) != IN:
+            dev.append(0.0)
+        elif body.pointContainment(P3(x, y, z0 - 0.02)) == IN:
+            dev.append(9.9)  # body above the plane
+    n_on = len(dev)
+    A = rc["A"]
+    at_A = body.pointContainment(P3(A[0], A[1] + 0.02, A[2] - 0.02)) == IN and body.pointContainment(P3(A[0], A[1] + 0.02, A[2] + 0.02)) != IN
+    # BC: just in front of the rear face, over a plate-free spot on the face line (the middle, outside the USB neck)
+    xb = rc["x"][0] + (rc["x"][1] - rc["x"][0]) * 0.3
+    yb = rc["y_rear"] - 0.05
+    at_bc = body.pointContainment(P3(xb, yb, rc["bc"] - 0.02)) == IN and body.pointContainment(P3(xb, yb, rc["bc"] + 0.02)) != IN
+    # the band above the USB slot's top, measured on the rear face outside the neck
+    zt = rc["bc"]
+    usb_top = P["panel_t"] + P["usb_opening"][1]
+    band = zt - usb_top
+    bay_top = g["bay_z"][1]
+    corners = [(x, y) for x in (min(p[0] for p in g["bay"]) + 1, max(p[0] for p in g["bay"]) - 1)
+               for y in (min(p[1] for p in g["bay"]) + 1, max(p[1] for p in g["bay"]) - 1)]
+    over = []
+    for x, y in corners:  # body from the bay's top up to the plane (or the facet, where the plane is above it)
+        z = bay_top
+        while body.pointContainment(P3(x, y, z + 0.25)) == IN and z < bay_top + 40:
+            z += 0.25
+        over.append(z - bay_top)
+    ok = n_on >= 3 and max(dev) < 1 and at_A and at_bc and 24 <= band <= 27 and min(over) >= 5 and rc["pocket_margin"] >= 6 and 90 <= rc["face"][0] <= 120
+    log(f"CHECK rear peak cut (one plane, A ({A[0]:.1f}, {A[1]:.1f}, {A[2]:.2f}), BC {rc['bc']:.2f}, triangle {rc['face'][0]:.0f} x "
+        f"{rc['face'][1]:.0f}): {n_on} probes on the plane, {sum(d > 1 for d in dev)} off; A on the crest {at_A}; BC on the rear face {at_bc}; "
+        f"band over the USB slot {band:.1f} mm; body over the UDB bay top >= {min(over):.1f} mm (want >= 5); wall over the plate top at the "
+        f"pockets under it {rc['pocket_wall_min']} (geometry: none under the triangle); its plan to the pockets {rc['pocket_margin']:.2f} mm "
+        f"(geometry, want >= 6) -> {'PASS' if ok else 'FAIL'}")
+    return {"rear_cut": ok}
 
 
 def check_m5(g, case):
@@ -1059,7 +1282,7 @@ def check_m5(g, case):
         ps += [p for p in (adsk.core.Point2D.create(u0 + (u1 - u0) * (0.05 + 0.225 * i), v0 + (v1 - v0) * (0.05 + 0.225 * j))
                            for i in range(5) for j in range(5)) if ev.isParameterOnFace(p)]
         out = list(zip(ev.getPointsAtParameters(ps)[1], ev.getNormalsAtParameters(ps)[1]))
-        # isParameterOnFace can pass points of a notched planar face that lie in its notch (under a pillar, say):
+        # isParameterOnFace can pass points of a notched planar face that lie in its notch (round a boss, say):
         # keep a sample only if the body is solid just behind it and empty just in front of it
         IN_ = adsk.fusion.PointContainment.PointInsidePointContainment
         on = lambda p, n, e: f.body.pointContainment(adsk.core.Point3D.create(p.x + n.x * e, p.y + n.y * e, p.z + n.z * e))
@@ -1075,7 +1298,6 @@ def check_m5(g, case):
                 return True
         return False
 
-    vis = {b.name: b.isLightBulbOn for b in c.bRepBodies}
     def pip(pt, ring):
         x, y, c_ = pt[0], pt[1], False
         for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
@@ -1149,7 +1371,7 @@ def check_m5(g, case):
                 log(f"  info: {name} face {q[0]} ({q[3]} mm2): " + ("rays graze a neighbour (reached 0.03 mm aside)" if q[1] == "graze"
                     else "hairline crevice side (< 0.03 mm wide, < 0.5 mm2)") + f" at {q[4]}")
     for b in c.bRepBodies:
-        b.isLightBulbOn = vis[b.name]
+        b.isLightBulbOn = b.name in ("Body", "Panel")
     return ok
 
 
@@ -1166,14 +1388,18 @@ def _run(_context):
     t0 = time.time()
     app = adsk.core.Application.get()
     g = json.load(open(JSON))
-    if globals().get("INTO_ACTIVE"):  # M6: rebuild inside the active document (a new version of a saved design)
-        design = adsk.fusion.Design.cast(app.activeProduct)
-        design.timeline.moveToBeginning()
-        design.timeline.deleteAllAfterMarker()
-        for i in reversed(range(design.userParameters.count)):
-            design.userParameters.item(i).deleteMe()
+    # v2: a NEW document, named DOC_NAME (v1, "Alice Case", is never touched). INTO_ACTIVE (a rebuild) builds into the active
+    # document only if it is called DOC_NAME and its timeline is empty
+    if globals().get("INTO_ACTIVE"):
+        doc = app.activeDocument
+        if doc.name != DOC_NAME or adsk.fusion.Design.cast(app.activeProduct).timeline.count:
+            raise RuntimeError(f"INTO_ACTIVE: the active document is {doc.name!r} with a non-empty timeline, not an empty {DOC_NAME!r}")
     else:
-        app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+        doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+        try:
+            doc.saveAs(DOC_NAME, app.data.activeProject.rootFolder, "v2 build (case/fusion_build.py)", "")
+        except Exception as e:  # (a new, empty document does not save from the API: save it by hand under that name)
+            log(f"note: document not saved as {DOC_NAME!r} yet ({str(e)[:80]}); File > Save it under that name")
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
@@ -1181,13 +1407,15 @@ def _run(_context):
     add_params(design, g["params"])
     halves = {h: build_half(root, g, h) for h in ("left", "right")}
     udb = build_udb(root, g)
-    build_tpu_snap(root, g)
+    build_tpu_clip(root, g)
     log(f"M2 parts built in {time.time() - t0:.1f} s")
     check_m2(design, g, halves, udb)
     case = build_case(root, g)
     log(f"M3 case built in {time.time() - t0:.1f} s")
     if globals().get("NO_CHECKS"):  # M6: build only; the checks run as their own script calls (a script that dies
         # mid-way is rolled back whole by Fusion, model included)
+        for b in case.component.bRepBodies:
+            b.isLightBulbOn = b.name in ("Body", "Panel")
         app.activeViewport.fit()
         log(f"built (checks skipped) in {time.time() - t0:.1f} s")
         return
@@ -1197,6 +1425,8 @@ def _run(_context):
     log(f"M4 checks done in {time.time() - t0:.1f} s")
     check_m5(g, case)
     log(f"M5 checks done in {time.time() - t0:.1f} s")
+    for b in case.component.bRepBodies:
+        b.isLightBulbOn = b.name in ("Body", "Panel")
     app.activeViewport.fit()
     step = import_udb_step(udb)
     if step:  # the real board against the slot roof and bay (the box placeholder is checked in check_m3)

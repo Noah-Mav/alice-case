@@ -1,6 +1,6 @@
 """Standalone UDB standoff check for a built "Alice Case" document (run inside Fusion via the MCP). Logs to case/out/fusion_build.log."""
 import os
-CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.expanduser("~/Documents/Development/alice-case/case")
+CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.expanduser("~/Documents/Development/personal/alice-case/case")
 import adsk.core, adsk.fusion, json, math, time
 G = json.load(open(os.path.join(CASE, 'out', 'case_geometry.json')))
 LOG = os.path.join(CASE, 'out', 'fusion_build.log')

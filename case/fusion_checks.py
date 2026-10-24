@@ -2,7 +2,7 @@
 Set WHICH before running, e.g. WHICH = ["m3"] (any of m3, m4, m5, step; default all). SKIP_STANDOFF skips the slow UDB standoff probe
 (run fusion_check_standoffs.py on its own). Results go to case/out/fusion_build.log."""
 import os
-CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.expanduser("~/Documents/Development/alice-case/case")
+CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.expanduser("~/Documents/Development/personal/alice-case/case")
 import adsk.core, adsk.fusion, json, time, traceback
 def run(_c):
     path = os.path.join(CASE, 'fusion_build.py')
@@ -26,6 +26,7 @@ def run(_c):
     ns['log'](f'--- checks only {time.ctime()} (active document)')
     try:
         for fn in globals().get('WHICH', ['m3', 'm4', 'm5', 'step']):
+            if fn == 'vol': ns['check_volumes'](g, halves)
             if fn == 'm3': ns['check_m3'](design, g, halves, udb, case)
             if fn == 'm4': ns['check_m4'](g, case)
             if fn == 'm5': ns['check_m5'](g, case)

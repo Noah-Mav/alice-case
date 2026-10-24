@@ -29,15 +29,16 @@ import alice  # noqa: E402
 
 P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bezels front/back
     # 8/11 -> 7/9.5, crease 10 -> 9, lower_cant 6 -> 8, panel_t 4 -> 3, floor_above_panel 3 -> 2
-    "typing_angle": 6.0, "tent": 4.0,  # tent 5 -> 4: user at M4 (back wall too tall); typing 7 -> 6: user at M6
+    "typing_angle": 8.0, "tent": 5.0,  # v2 (user, heights helper): 6 / 4 -> 8 / 5, front kept low by base_min 3.5 (v1 had tent 5 -> 4 at M4, typing 7 -> 6 at M6)
     "plate_t": 1.5, "cutout": 14.0, "cutout_print": 14.05, "plate_to_pcb": 5.0, "pcb_t": 1.6, "socket_h": 1.8,
     "lip": 6.0, "skirt_bottom_out": 2.0,  # M7: Cherry/GMK skirt bottomed out (rest 6.0, verified, see keycaps.py); lip 2.0 -> 6.0 (user: skirt level with the case edge at rest): stack 0.5 lower (solid front base), walls up the rest
-    "artisan_gap": 1.5, "snap_gap": 0.9, "plate_wall_gap": 1.0,
-    "bezel_side": 6.0, "bezel_front": 7.0, "bezel_back": 9.5,
+    "artisan_gap": 1.5, "plate_wall_gap": 1.0,
+    "bezel_side": 6.0, "bezel_front": 6.0, "bezel_back": 8.5,  # v2: front 7 -> 6, back 9.5 -> 8.5 (user approved)
     "pocket_r": 3.0, "cavity_r": 6.0, "outer_r": 3.0, "top_round": 1.0, "opening_chamfer": 0.75,
     "crease_mode": "front_horizontal",  # M6 (user): the chosen design, front faces level ("deepening" = the M5 rule)
-    "crease_depth": 9.0, "lower_back": 0.5,  # crease: 10 mm on the front, lower band = lower_back x height at the back centre
-    "lower_cant": 8.0, "panel_t": 4.0, "rim": 6.0, "rear_strip_end": 6.0,  # M6 (user): = rim, so the back edge runs square into the side rims (was 10: an inset step at each back corner)
+    "crease_depth": 9.0, "lower_back": 0.477,  # v2: 0.5 -> 0.477 keeps the end creases level (0.467 was worked out with the old ridge rule's heights; with the R2-midpoint ridge it leaves them 0.41 mm apart)  # crease: 10 mm on the front, lower band = lower_back x height at the back centre
+    "lower_cant": 12.0, "panel_t": 4.0,  # v2: lower_cant 8 -> 10 -> 12 (user) (front footprint inset stays 1.27 mm with the front crease 1.9 mm lower)
+     "rim": 6.0, "rear_strip_end": 6.0,  # M6 (user): = rim, so the back edge runs square into the side rims (was 10: an inset step at each back corner)
     # M4: the strip's lip rises up the rear face to the USB centre (CloudNine's seam runs through the port); it
     # meets the seam this far from each rear corner, is this thick at the desk (the lean adds ~0.4 mm at its top),
     # and its top edge runs down to the seam over the last 7.2 mm in a straight diagonal (1:2, ~27 deg), so seen
@@ -48,31 +49,28 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # below, in the 3.6 mm of body above the seam; floor corners: Ø6 ball mill on the panel from its top. The slot
     # is 22 wide (bay 19) so the floor R3 clears the UDB board's rear corners (0.3 mm), which sit inside the lip.
     "usb_r": [3.0, 3.0], "usb_slot_w": 22.0,
+    # v2 (user): the visible opening is a neck usb_neck = [width, depth] through the rear face; behind it the 22 wide
+    # chamber (usb_slot_w) holds the board's rear end (its top corners must clear the R3 roof corners, see the test).
+    # The neck step sits 0.25 mm behind the board's rear edge, so usb_recess = neck depth + 0.25
+    "usb_neck": [17.0, 2.0],
     "panel_gap_wood_fb": 0.5, "panel_gap_wood_lr": 0.1, "panel_gap_print": 0.2,
-    "ledge": 14.0, "feet": [28.0, 6.0],  # M7 (user): 8 -> 6 wide (no longer covering screws); Ø3.3 pegs keep 1.35 of TPU each side
-    "foot_depth": 1.0, "foot_proud": 2.0,
-    # M6 (user): removable press-fit TPU test feet: the plug in the pocket is foot_fit oversize per side. Pocket depth
-    # stays 1.0: the corner screws' countersinks start at the pocket floor and need 1.66 of the 3.0 panel (2.0 deep
-    # would put the heads 0.66 into the insert / rabbet ceiling)
-    "foot_fit": 0.15,
-    # M6 (user): two round pegs on each foot press into Ø3 x 2 holes through the panel from the pocket floor: diameter,
-    # hole depth, the first peg's distance from the corner screw (>= 1 mm wall to its countersink); the second sits
-    # at the foot's far round end. The pegs are foot_fit oversize per side; the pocket stays for location
-    "foot_peg": [3.0, 2.0, 6.0], "usb_opening": [12.0, 7.2],  # height used; the opening is now the bay-wide slot
-    # screws: 5, one at each panel corner (under the feet) and the front V point (M7, user: the mid-back one dropped)
+    "ledge": 14.0,
+    # v2 (user): the TPU feet (28 x 6 bars, pockets, pegs) are gone: 4 adhesive bumpons (3M SJ5302, 7.9 dia x 2.2 high
+    # hemispheres) sit in shallow locating recesses in the underside: recess diameter, depth, and how far in from the
+    # two desk-level footprint edges of each corner (front pair under the solid bezel, rear pair in the body beside the
+    # panel). The panel's sides are no longer set by feet: panel_half_w either side of the ridge
+    "bumpon": {"d": 7.9, "h": 2.2, "recess_d": 8.4, "recess_depth": 0.5, "inset": 14.0}, "panel_half_w": 106.1,
+    "rear_cut": {"drop": 4.0, "back": 14.3},  # v2 item 9 (user, medium), revised: a subtle accent, width ~91 at the rear face (was 181), apex 14.3 forward (was 25); see _build and the test (>= 6 mm to the pockets)
+    "usb_opening": [12.0, 7.2],  # [1] = height used; [0] is NOT used (the visible width is usb_neck, the chamber usb_slot_w)
+    # screws: 3 (M8): the two back panel corners and the V point
     "udb": [18.0, 16.5],            # §6.9 Unified Daughterboard C3, at the back on the ridge
     "udb_r": 2.0, "udb_holes": [14.0, 12.5], "udb_hole_d": 2.2, "udb_t": 1.6, "udb_air": 0.5,
     "usb_receptacle": [8.94, 7.35, 3.21],  # HRO TYPE-C-31-M-12 w x depth x h, on the UDB top, face at the board edge
-    "usb_recess": 1.0,              # receptacle face behind the outer rear face (<= 1.5)
+    "usb_recess": 2.25,             # receptacle face behind the outer rear face: the neck depth + 0.25 (v2; was 1.0, limit <= 1.5)
     "keycap_h": 7.5,                # M6: Cherry profile cap, skirt to top (~R2-R4), for the bottomed-out envelope only
     "switch_top_h": 6.6,            # MX top housing above the plate top (housing top 11.6 above the PCB top)
     "jst": [6.0, 4.2, 2.95], "jst_pocket": [8.0, 6.0],  # §6.10 JST-SH 4-pin header, free space around it
-    # M6 PCBsnap (Geon x Nuxros, user approved; sizes from product photos, +-30 %, re-run with a measured one): a
-    # staple. Length along the wall, reach onto the PCB (top bar and legs), centre notch between the legs; the spine
-    # (thickness) stands in the PCB-to-wall gap, the top bar runs from the PCB top to snap_bar_air under the plate,
-    # the end legs drop snap_drop below the PCB underside. Corner/stab distance
-    "snap": [20.0, 2.5, 8.5], "snap_spine": 0.6, "snap_bar_air": 0.3, "snap_drop": 2.5, "snap_wall_air": 0.1,
-    "snap_corner": 15.0, "snap_stab": 3.0, "snap_flat": 0.25,
+    "snap_gap": 0.9,                # PCB edge to pocket wall at mid-PCB (the clip spine fills it)
     "screw_head": 6.72,             # ISO 10642 M3 head diameter
     "screw_clear": 3.4,             # M3 clearance hole in the panel (90° countersink to screw_head)
     "insert_hole": [4.0, 6.0],      # print: heat-set M3 x 5.7 hole, diameter and depth above the rabbet ceiling (M5: 6.5 -> 6.0)
@@ -100,33 +98,53 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # M7 (user): solid front base. The panel covers only the rear (bay, channels, USB): a pentagon whose front is the
     # case's front V moved back panel_shift (tip on the ridge). In front of it the body is solid to the desk:
     # >= base_min of body under the pocket floor, >= base_min_groove under the relief grooves (H_front rule)
-    "panel_shift": 50.0,  # (M7 panel_t 4: 41 -> 50 brings the side-front corners to the screws' first sound spots; the bay and channels stay covered)
-    "panel_front_r": 6.0, "panel_front_screw_dx": 55.0, "rear_foot_clear": 3.0, "band_end_run": 21.2, "screw_recess_margin": 1.0,
+    "panel_shift": 48.0,  # (M7 panel_t 4: 41 -> 50 brings the side-front corners to the screws' first sound spots; the bay and channels stay covered)
+    "panel_front_r": 6.0, "band_end_run": 21.2, "screw_recess_margin": 1.0,
     # M7 (user, reference photo): a shallow recessed field on the panel's underside: depth, border of full panel all
     # round, its own corner radius (>= the Ø6 flat end mill's R3), and full-thickness tabs round each screw countersink
-    "panel_recess": [0.4, 3.5, 3.0, 1.5],
+    "panel_recess": [0.6, 3.5, 3.0, 1.5],  # v2 (user): depth 0.4 -> 0.6
+    # v2: round each of the 3 screws a seat pad: the field is only screw_seat[0] deep there (a round pad of radius head / 2
+    # + screw_seat[1], merged into the border), so the countersink cone still leaves panel_t - seat - 1.66 = 1.94 mm
+    "screw_seat": [0.4, 1.5],
     # M7 (user): the same 0.4 mm recess on the panel's rear face (its edge and the band): border (smaller than the
     # bottom's 3.5: the face is only 7.6 mm tall), corner radius; a full-thickness frame of the same border round the
     # USB notch. Drawn in (x, z) on each rear lean plane; cut on an extra setup (the panel on edge / angle plate)
-    "band_recess": [1.5, 1.5], "base_min": 4.5, "base_min_groove": 3.5,
-    # PCBsnap pillars (M6: posts in the snap's centre notch, the "O-ring post" it locks onto): width along the wall
-    # (its R3 wall fillets reach ~1.7 mm along the wall at the spine, inside the 7 mm notch), depth from the wall, top below the PCB underside, corner radius; cable channel height
+    "band_recess": [1.5, 1.5], "base_min": 3.5, "base_min_groove": 3.5,
     "relief": [7.0, 1.25],  # M6 floor relief grooves: notch diameter / 1.5 (> Ø6 tool), depth below the floor plane
     # M6 grooves under the sockets: margin round each socket keep-out, gap closing between neighbours in a row,
-    # land left to the pocket wall, clearance round pillars / bosses / JST breakthroughs
-    "socket_margin": 1.0, "socket_bridge": 3.0, "groove_wall": 4.0, "island_clear": 1.0,  # M6 (user): flat 4 mm band along every wall for the snap legs / posts
-    "pillar": [6.0, 3.5, 0.25], "pillar_r": 1.0, "chan_h": 4.0,  # M6 (user): 6 wide, the checkpoint's 3.5 deep (capped at the snap's reach)
-    # M6 (user, option A): the pillar's fillets into the wall are R1.5 (Ø3 tool; R1 / Ø2 is too long and thin for
-    # hardwood ~15 mm down). The snap's notch is 8.5 so its legs clear the 6 mm post and those fillets: an estimate
-    # from photos (6-8); measure a real snap, and if its notch is narrower, revisit the fillet or the post
-    "pillar_fillet": 1.5,
+    # land left to the pocket wall, clearance round bosses / JST breakthroughs
+    "socket_margin": 1.25, "socket_bridge": 3.0, "groove_r": 2.0, "clip_keep": 1.0, "groove_wall": 4.0, "island_clear": 1.0,  # M6 (user): flat 4 mm band along every wall (v2: for the PCB clips' recesses)
+    "chan_h": 4.0,  # cable channel height
+    # v2 (user): the PCBsnaps, their pillars and the pillar fillets are gone. The PCB is held by 10 printable TPU C-clips
+    # (5 per half) on its edge: each 10 long, a slot of 1.5 for the 1.6 PCB (it grips), 2.5 of ledge under the PCB, a 1.0
+    # lip 1.5 over the PCB top (30 deg lead-in), the spine filling the PCB-to-wall gap, a hex lattice below. Each clip
+    # sits in a recess in the pocket floor: recess = [length, width, depth], width measured in from the pocket wall
+    # (so it reaches 3.8 - wall gap under the PCB), R1.5 corners (Ø3 tool), its wall side on the wall (no undercut),
+    # and a 45 deg lead-in chamfer (the depth wide) on its three open sides. The floor plane under a recess must be
+    # >= clip_floor_min above the desk (local exception to base_min: 4.0 - 0.5 = 3.5 left under it).
+    # clip_pts: the PCB-local edge points (v1 PCB frame, as the spots were chosen); geometry.py snaps them to the frozen edge
+    "clip": {"len": 10.0, "slot": 1.5, "under": 2.5, "lip": 1.0, "lip_overlap": 1.5, "lip_lead": 30.0, "lead": 0.4,
+             "wall_air": 0.1, "lattice_cell": 2.3, "lattice_wall": 0.8,
+             # fit in the recess: the clip's plan is the recess's own outline (rr_x: 10.4 long, R clip_r corners, running past the
+             # wall) shrunk by `fit` all round: 0.2 to the ends and the R1.5 corners at the recess bottom (its narrowest: the
+             # lead-in only widens it), trimmed by the profile's ledge (2.5 under the PCB, 0.4 in from the recess side) and the
+             # spine (wall_air 0.1 off the wall). v2 first run: the square clip corners stood 0.2 into the R1.5 ones, 10 slivers
+             # of 0.006 .. 0.03 mm3 in the Fusion interference check. The test asserts the clearance >= `min_fit`
+             "fit": 0.2, "min_fit": 0.15},
+    "clip_clear": 0.5, "clip_slide": 2.0, "clip_recess": [10.4, 3.8, 0.5], "clip_r": 1.5, "clip_floor_min": 4.0,
+    "clip_pts": {"left": [[71.3, 6.3], [124.3, 29.5], [102.7, 81.0], [13.0, 85.6], [20.0, 26.9]],
+                 "right": [[197.0, 6.7], [139.0, 30.0], [154.4, 80.0], [245.0, 85.6], [240.0, 26.9]]},
+    # v2: the v1 dummy PCB and plate are reused, so their outlines (case/frozen_v1.json) are frozen, not re-derived from
+    # the opening at the new angles; the pocket walls grow round them to keep at least pcb_wall_min (mid-PCB gap
+    # snap_gap, +- 0.1 over the tilted PCB's thickness) and plate_wall_min (v1: 0.906)
+    "pcb_wall_min": 0.80, "plate_wall_min": 0.90,
     "cable_channel": 13.0,  # > 2 cavity_r so the R6 opening keeps it
     "lift_step": 0.1,               # H_front rounding (M7: 0.5 -> 0.1, so the stack sits where the floor rule puts it)
     "ridge_clear": 0.5,             # §6.6 PCB/plate clip at the ridge
-    # M5: each half moved outward along layout x (left, right; mm) before the transforms, widening the centre web;
-    # the ridge sits at the key-gap midpoint, so the web is symmetric about it (the outline centre is not: the
-    # right half is ~4.6 mm wider than the left, which no x shift can change)
-    "half_spread": [1.2, 1.2],
+    # M5: each half moved outward along layout x (left, right; mm) before the transforms, widening the centre web.
+    # v2: the ridge (centreline) is the midpoint of the two R2 (anchor) rows' extents, not the whole-layout key gap,
+    # so both R2 rows and both outer case edges are equidistant from it
+    "half_spread": [3.5, 3.5],  # v2: 1.2 -> 3.5: the ridge is now the R2 midpoint, which puts the right half's top-row Y key 2.4 mm from it
     "web_mode": os.environ.get("ALICE_WEB_MODE", "stepped"),          # M6 (user keeps both): "stepped" (centre split follows the keys) | "straight"
     "web_band": 16.0,               # M6: the web-side treatment (hull / R3 corners) this near the ridge
     "row_smooth_r": 100.0, "row_smooth_depth": 1.0,  # M6: front/back row edges, cusp fill radius (leaves >= 12 mm straight per key for the snaps) and max depth
@@ -137,6 +155,10 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
 # Kailh CPG151101S11 hotswap socket incl. pads, key-local layout mm (y toward the user), from the KiCad MX
 # hotswap footprint (pads at (-7.085, -2.54) and (5.842, -5.08)). ponytail: approximate box, not the drawing.
 SOCKET = (-8.4, -7.0, 7.2, -0.6)
+# the real S-shaped socket body (case/fusion_export.py SOCKET_OUTLINE), key-local, +y = back: the clips' ledges are
+# kept clear of it, not of the larger SOCKET box
+SOCKET_REAL = [(-6.085, 1.51), (-0.2, 1.51), (-0.2, 3.4), (4.815, 3.4), (4.815, 6.11), (-1.0, 6.11), (-1.0, 4.2), (-6.085, 4.2)]
+FROZEN = json.loads((Path(__file__).resolve().parent / "frozen_v1.json").read_text())
 
 # MX centre post (Ø4) sticks out below the PCB: JST keep-out. ponytail: ignores 5-pin pegs; add if PCBs use them.
 POST_R = 2.0
@@ -215,105 +237,42 @@ def world(M, u, v, w):
     return tuple((M @ [u, v, w, 1])[:2])
 
 
-def place_snaps(pcb, below, above, stabs, sgn):
-    """§6.11: one snap on the outer end, front, back and (M5) inner end each, flush on one straight PCB edge segment (>= 1 mm from
-    its ends), >= snap_corner along the edge from the outline's corners, >= snap_stab from stabilizer cutouts, clear
-    of sockets and the JST pocket, as far from corners as possible.
-    A corner is a net turn >= 45° between consecutive straight segments (>= 5 mm). Stagger steps (2-3 mm jogs that
-    return to the same heading) and the 3° kinks of curved rows aren't corners: the outer ends are stepped per row,
-    so a 15 mm rule that counted steps would leave no straight wall long enough.
-    M6 staple: the spine reaches snap_spine past the PCB edge (snap_gap - snap_spine of air at mid-PCB, so the wall
-    lean over its height keeps it off the wall). Its legs and the pillar in its notch (under the PCB) stay clear of
-    `below` (sockets, centre posts, JST pocket); its top bar (over the PCB) clear of `above` (switch housings). Where
-    the 2.5 mm reach doesn't fit, it gets shallower (2.0). ponytail: sizes from photos; re-run with a measured one."""
-    L, notch = P["snap"][0], P["snap"][2]
-    out_ = P["snap_spine"]
-    pa0, pa1 = -(P["snap_gap"] - out_) - 1.5, P["pillar"][1] - (P["snap_gap"] - out_)  # pillar, from the outer face
-    ring = list(orient(pcb).exterior.coords)[:-1]  # ccw: outward normal of edge (dx, dy) is (dy, -dx)
-    n = len(ring)
-    seg = [(np.array(ring[i]), np.array(ring[(i + 1) % n])) for i in range(n)]
-    lens = [float(np.linalg.norm(q - p)) for p, q in seg]
-    head = [math.atan2(*(q - p)[::-1]) for p, q in seg]
-    start = np.concatenate([[0.0], np.cumsum(lens)[:-1]])
-    total = sum(lens)
-    long_ = [i for i in range(n) if lens[i] >= 5]
-    # M6: a stagger step deeper than 5 mm (a turn and its opposite turn over a step < 15 mm long, back to the same
-    # heading, e.g. where a straightened end run rejoins the stepped wall) is no corner either
-    pairs_ = list(zip(long_, long_[1:] + long_[:1]))
-    turn = [math.remainder(head[j] - head[i], math.tau) for i, j in pairs_]
-    big = [abs(t_) >= math.radians(45) for t_ in turn]
-    step_ = [False] * len(pairs_)
-    for k_ in range(len(pairs_)):
-        k2 = (k_ + 1) % len(pairs_)
-        if big[k_] and big[k2] and abs(turn[k_] + turn[k2]) < math.radians(45) and lens[pairs_[k_][1]] < 15:
-            step_[k_] = step_[k2] = True
-    corner_s = [x for (i, j), b_, st_ in zip(pairs_, big, step_) if b_ and not st_ for x in (start[i] + lens[i], start[j])]
-    cdist = lambda s: min(min(abs(s - c), total - abs(s - c)) for c in corner_s)
-    dirs = {"outer": (-sgn, 0), "front": (0, -1), "back": (0, 1), "inner": (sgn, 0)}  # M5: 4 per half
-    # M6: a 20 mm staple spans more than one straight segment of the R100-smoothed row edges: any stretch of edge
-    # within snap_flat of its chord will do; the outer face sits snap_spine past the edge's outermost point there
-    ext_ = LineString(ring + ring[:1])
-    def spots(L, end=False):
-        out = []
-        for s_ in np.arange(L / 2, total - L / 2, 0.5):
-            pa, pb = (np.array(ext_.interpolate(x).coords[0]) for x in (s_ - L / 2, s_ + L / 2))
-            t = (pb - pa) / np.linalg.norm(pb - pa)
-            if end:  # (an end snap: lined up with the longest row end it spans, which it sits on)
-                ov = [(min(start[i] + lens[i], s_ + L / 2) - max(start[i], s_ - L / 2), i) for i in range(n)]
-                i_ = max(ov)[1]
-                t = (seg[i_][1] - seg[i_][0]) / lens[i_]
-            nrm = np.array([t[1], -t[0]])
-            xs_ = list(np.arange(s_ - L / 2, s_ + L / 2 + 1e-9, 0.25))
-            dev = [(np.array(ext_.interpolate(x).coords[0]) - pa) @ nrm for x in xs_ +
-                   [x for x in start if s_ - L / 2 < x < s_ + L / 2]]  # (the vertices too: the outermost point exactly)
-            top = max(dev)
-            mid = (pa + pb) / 2
-            m_ = mid + nrm * (top - (mid - pa) @ nrm)
-            if max(dev) - min(dev) <= P["snap_flat"]:
-                out.append((s_, m_, t, nrm))
-        return out
-    best = {}
-    wall_ = pcb.buffer(P["snap_gap"] - 0.1, quad_segs=16)  # (the whole part clear of the wall at mid-PCB, corners included)
-    # M6 (user): 4 per half, all the full part: 2 on the front edge and 2 on the back, each as close to one of the
-    # half's 4 corners as the corner rule (snap_corner, else 10, 5), sockets and stabs allow; none on the ends
-    for cmin in (P["snap_corner"], 10.0, 5.0):
-        for D in (out_ + P["snap"][1], out_ + 2.0):
-            cands = {}
-            for s_, m, t, nrm in spots(L):
-                side = next((k for k, d in dirs.items() if nrm @ d >= 0.7), None)
-                if side not in ("front", "back"):
-                    continue
-                cd = min(cdist(s_ - L / 2), cdist(s_ + L / 2))
-                if cd < cmin:
-                    continue
-                rr = lambda s0, s1, a0, a1: Polygon([m + t * s0 + nrm * (out_ - a0), m + t * s1 + nrm * (out_ - a0),
-                                                     m + t * s1 + nrm * (out_ - a1), m + t * s0 + nrm * (out_ - a1)])
-                poly = rr(-L / 2, L / 2, 0, D)
-                legs = [rr(-L / 2, -notch / 2, 0, D), rr(notch / 2, L / 2, 0, D)]
-                post = rr(-P["pillar"][0] / 2, P["pillar"][0] / 2, pa0, min(pa1, D))
-                if not poly.within(wall_) or poly.intersects(above) or any(q_.intersects(below) for q_ in legs + [post]) or \
-                        (not stabs.is_empty and poly.distance(stabs) < P["snap_stab"]):
-                    continue
-                cands.setdefault(side, []).append({"side": side, "poly": poly, "legs": legs, "spine": rr(-L / 2, L / 2, 0, out_),
-                                                   "corner_dist": round(cd, 3), "depth": D, "u": m[0], "length": L,
-                                                   "post_depth": min(pa1, D) + P["snap_gap"] - out_})
-            for side, cs_ in cands.items():
-                for k, sg in ((side, -1), (side + "2", 1)):  # the one nearest the -u corner, then the +u one
-                    if k in best:
-                        continue
-                    ok_ = [c_ for c_ in cs_ if all(abs(c_["u"] - b_["u"]) >= L + 5 for b_ in best.values()
-                                                   if b_["side"].rstrip("2") == side)]
-                    if ok_:
-                        best[k] = dict(max(ok_, key=lambda c_: sg * c_["u"]), side=k)
-    dirs = {"front": 0, "front2": 0, "back": 0, "back2": 0}
-    if len(best) != len(dirs):
-        raise SystemExit(f"no PCBsnap spot for {set(dirs) - set(best)}")
-    for v in best.values():
-        v.pop("u")
-        a_, b_ = list(v["poly"].exterior.coords)[:2]
-        mid = pcb.exterior.interpolate(pcb.exterior.project(Point((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)))
-        v["edge_mid"] = [mid.x, mid.y]  # the PCB edge point under the snap's middle (the Fusion gap check)
-    return [best[k] for k in dirs]
+def place_clips(pcb, pts, sockets_real, stabs, jst_pocket):
+    """v2: the TPU C-clips on the PCB edge. For each PCB-local edge point of P["clip_pts"], the nearest point of the
+    (frozen) PCB outline, the edge's tangent t and outward normal n there, and in that frame (t along the edge, n out
+    from it): the clip's frame; the floor recess is made later, once the pocket walls are known
+    (clip_recess). A point slides along the edge (<= clip_slide) to where the ledge is at least
+    clip_clear from the real hotswap socket bodies, stab cutouts and the JST pocket; raises if none does."""
+    L = P["clip_recess"][0]
+    ext = pcb.exterior
+    out = []
+    for i, (x, y) in enumerate(pts):
+        s_in = ext.project(Point(x, y))
+        if ext.interpolate(s_in).distance(Point(x, y)) > 0.5:
+            raise SystemExit(f"clip point {(x, y)} is {ext.interpolate(s_in).distance(Point(x, y)):.2f} mm off the PCB edge")
+        # the given point, or the nearest spot along the edge (<= clip_slide) where the ledge clears the keep-outs
+        for slide in [0.0] + [q * sg for q in np.arange(0.25, P["clip_slide"] + 1e-9, 0.25) for sg in (1, -1)]:
+            s0 = s_in + slide
+            c = np.array(ext.interpolate(s0).coords[0])
+            a, b = np.array(ext.interpolate(s0 - 1.0).coords[0]), np.array(ext.interpolate(s0 + 1.0).coords[0])
+            t = (b - a) / np.linalg.norm(b - a)
+            n = np.array([t[1], -t[0]])
+            if pcb.contains(Point(*(c + n * 0.5))):
+                n = -n
+            frame = lambda s_, q_: tuple(c + t * s_ + n * q_)
+            rect = lambda s0_, s1_, q0, q1: Polygon([frame(s0_, q0), frame(s1_, q0), frame(s1_, q1), frame(s0_, q1)])
+            cl = P["clip"]
+            under = rect(-cl["len"] / 2, cl["len"] / 2, -cl["under"], 0.0)
+            dmin = min(under.distance(o_) for o_ in sockets_real + stabs + [jst_pocket])
+            if dmin >= P["clip_clear"]:
+                break
+        else:
+            raise SystemExit(f"clip {i + 1} at {(round(x, 1), round(y, 1))}: no spot within {P['clip_slide']} mm clears the sockets / stabs / JST")
+        # how straight the edge is along the clip (the recess is a straight box on the tangent)
+        dev = [abs((np.array(ext.interpolate(s0 + d_).coords[0]) - c) @ n) for d_ in np.arange(-L / 2, L / 2 + 0.1, 0.5)]
+        out.append({"name": i + 1, "edge_pt": [float(c[0]), float(c[1])], "t": t.tolist(), "n": n.tolist(), "slide": float(slide),
+                    "edge_dev": float(max(dev)), "ledge_clear": float(dmin)})
+    return out
 
 
 def coords(g):
@@ -325,12 +284,13 @@ def coords(g):
 
 
 def build(lay):
-    """The ridge (tent fold) is the key-gap midpoint, after half_spread moves the halves apart (M5): the centre
-    web is symmetric about it. The outline is not centred on it (see half_spread)."""
+    """v2: the ridge (tent fold, the case centreline) is the midpoint of the two R2 (anchor) rows' extents after
+    half_spread moves the halves apart. Both R2 rows then sit equally either side of it, and so do the outer case
+    edges (outline_offset ~ 0). The nearest key of each half must still be >= 2 mm from it."""
     g = _build(lay)
     lo, hi = g["key_gap"]
-    if hi - lo < 4:
-        raise SystemExit(f"key gap {lo:.2f} .. {hi:.2f} too narrow: the ridge needs >= 2 mm to each half")
+    if g["ridge_x"] - lo < 2 or hi - g["ridge_x"] < 2:
+        raise SystemExit(f"key gap {lo:.2f} .. {hi:.2f}: the ridge {g['ridge_x']:.2f} needs >= 2 mm to each half's keys")
     ox0, _, ox1, _ = g["_shapes"]["outline_sharp"].bounds
     g["outline_offset"] = (ox0 + ox1) / 2 - g["ridge_x"]
     return g
@@ -345,12 +305,30 @@ def _build(lay):
     caps = alice.keycaps(placed)
     pts = {h: [p for o in alice.solid(placed) if o["half"] == h for p in alice.footprint(o)] for h in ("left", "right")}
     key_gap = (max(p[0] for p in pts["left"]), min(p[0] for p in pts["right"]))
-    ridge = sum(key_gap) / 2
+    # v2: the centreline is the midpoint of the R2 (anchor row: Shift Z X C V B / N M < > Shift Fn) extents, not of the
+    # whole-layout key gap (v1: sum(key_gap) / 2, which the right half's top-row Y key pulled 2.32 mm left of it)
+    r2 = {h: [p[0] for o in alice.solid(placed) if o["half"] == h and o["rname"].startswith("Anchor") for p in alice.footprint(o)]
+          for h in ("left", "right")}
+    ridge = (min(r2["left"]) + max(r2["right"])) / 2
     y_front = max(p[1] for q in pts.values() for p in q)
     flip = lambda xy: (xy[0], y_front - xy[1])  # layout -> local (u, v)
 
     M0 = {"left": matrix(1, ridge, 0.0), "right": matrix(-1, ridge, 0.0)}
     world = lambda M, u, v, w: tuple((M @ [u, v, w, 1])[:2])
+
+    # v2: the v1 PCB and plate are frozen (case/frozen_v1.json): each half's keys only moved along u (half_spread), so the
+    # outlines move with them. Refuse to build if the keys changed in any other way.
+    frozen = {}
+    for h in ("left", "right"):
+        f_ = FROZEN[h]
+        ks_ = [(o["x"], y_front - o["y"], -o["ang"]) for o in caps if o["half"] == h]
+        if len(ks_) != len(f_["keys"]):
+            raise SystemExit(f"{h}: {len(ks_)} keys, the frozen v1 PCB has {len(f_['keys'])}")
+        dus = {round(k[0] - q[0], 3) for k, q in zip(ks_, f_["keys"])}
+        if len(dus) != 1 or any(abs(k[1] - q[1]) > 2e-3 or abs(k[2] - q[2]) > 2e-3 for k, q in zip(ks_, f_["keys"])):
+            raise SystemExit(f"{h}: the keys are no longer the v1 keys moved along u (du {dus}); the frozen PCB / plate do not apply")
+        du_ = dus.pop()
+        frozen[h] = {"du": du_, "pcb": affinity.translate(Polygon(f_["pcb"]), du_, 0), "plate": affinity.translate(Polygon(f_["plate"]), du_, 0)}
 
     # §6.1 key envelopes: footprint box from skirt-at-bottom-out to the bezel top, projected to plan
     env = [MultiPoint([world(M0[o["half"]], *flip(c), w) for c in alice.footprint(o)
@@ -396,6 +374,23 @@ def _build(lay):
             fills += [cl.intersection(q.buffer(0.5)) for q in getattr(add, "geoms", [add])
                       if q.area > 1e-4 and abs(q.centroid.x - ridge) <= P["web_band"]]
     opening = unary_union([opening] + fills)
+    # v2: the frozen v1 PCB and plate must fit the pocket as built at the new angles: at both faces of each (the tilt
+    # changes what the vertical walls see) the wall keeps pcb_wall_min / plate_wall_min round them, so the pocket grows
+    # where the tilted PCB comes closer than that (R0.5 closing: no new sharp corners)
+    top_w_ = -P["plate_to_pcb"]
+    need_ = []
+    for h in frozen:
+        M_ = M0[h]
+        for poly_, ws_, gap_ in ((frozen[h]["pcb"], (top_w_ - P["pcb_t"], top_w_), P["pcb_wall_min"]),
+                                 (frozen[h]["plate"], (-P["plate_t"], 0.0), P["plate_wall_min"])):
+            for w_ in ws_:
+                A_ = [M_[0, 0], M_[0, 1], M_[1, 0], M_[1, 1], M_[0, 2] * w_ + M_[0, 3], M_[1, 2] * w_ + M_[1, 3]]
+                need_.append(affinity.affine_transform(poly_, A_).buffer(gap_, quad_segs=16))
+    grown_ = unary_union([opening] + need_).buffer(P["stagger_r"], quad_segs=16).buffer(-P["stagger_r"], quad_segs=16)
+    pocket_growth = grown_.difference(opening)
+    pocket_growth_max = max([Point(q).distance(opening.boundary) for g_ in getattr(pocket_growth, "geoms", [pocket_growth])
+                             for q in g_.exterior.coords] or [0.0])
+    opening = grown_
     oo_ = sorted(getattr(opening, "geoms", [opening]), key=lambda o: o.bounds[0])
     web_sym = [ridge - oo_[0].bounds[2], oo_[-1].bounds[0] - ridge]  # (symmetric about the ridge)
     opening = opening.simplify(0.002).buffer(0.002, join_style="mitre")  # then out again: still holds the original
@@ -470,6 +465,42 @@ def _build(lay):
     back_mid = (ridge, lt[1] + (rt[1] - lt[1]) * (ridge - lt[0]) / (rt[0] - lt[0]))
     heights = {"front_left": top(*lb), "front_right": top(*rb), "front_v": top(*v),
                "back_left": top(*lt), "back_right": top(*rt), "back_centre": top(*back_mid)}
+    # v2 (user): ONE plane truncates the peak behind the ridge: it holds the horizontal line on the rear face rear_cut["drop"]
+    # below the peak height (BC) and the point A on the ridge crest rear_cut["back"] forward of the rear edge (on the roof);
+    # everything above it goes. The plane meets each roof facet in a straight line from A to the rear face, so what is left
+    # of the rear face's top is a triangle (base on the rear face at BC, between the facets; apex A) and the cut face is that
+    # triangle in plan too. dz/dy < 0: the plane rises toward the front, the crest toward the back, so they only cross at A.
+    rc_ = P["rear_cut"]
+    yb_ = back_mid[1]
+    z_bc = heights["back_centre"] - rc_["drop"]
+    A_ = np.array([ridge, yb_ - rc_["back"], top(ridge, yb_ - rc_["back"])])
+    k_dz = (A_[2] - z_bc) / (A_[1] - yb_)
+    xs_ = []
+    for lo_x, hi_x in ((lt[0], ridge), (rt[0], ridge)):  # where the roof on each side is at BC (monotone toward the ridge)
+        for _ in range(60):
+            mid_x = (lo_x + hi_x) / 2
+            if top(mid_x, yb_) < z_bc:
+                lo_x = mid_x
+            else:
+                hi_x = mid_x
+        xs_.append((lo_x + hi_x) / 2)
+    rear_cut = {"A": A_.tolist(), "bc": z_bc, "k": k_dz, "y_rear": yb_, "x": xs_,
+                "points": [[xs_[0], yb_, z_bc], [xs_[1], yb_, z_bc], A_.tolist()],
+                "face": [xs_[1] - xs_[0], rc_["drop"]], "plan": [[xs_[0], yb_], [xs_[1], yb_], [A_[0], A_[1]]]}
+    # the wall left over the plate top where the cut plane passes over a pocket: the opening's outline (every 0.25 mm) inside
+    # the cut's plan triangle, plane z less the plate top (w = 0) there. The cut triangle also clears the UDB bay (below)
+    tri_ = Polygon(rear_cut["plan"])
+    pw_ = []
+    for g_ in getattr(opening, "geoms", [opening]):
+        ring_ = g_.exterior
+        for s_ in np.arange(0, ring_.length, 0.25):
+            q_ = ring_.interpolate(s_)
+            if tri_.buffer(0.01).contains(q_):
+                pw_.append(z_bc + k_dz * (q_.y - yb_) - surface(Ms.values(), 0.0, q_.x, q_.y))
+    rear_cut["pocket_wall_min"] = min(pw_) if pw_ else None
+    rear_cut["pocket_margin"] = float(tri_.distance(opening))  # plan distance, cut triangle to the pockets (both halves)
+    heights_cut = dict(heights, back_centre=z_bc)
+    max_cut = max(max(heights_cut.values()), float(A_[2]))
 
     # §6.8 lower band -> §6.7 bottom footprint: every outline edge (split at the ridge) gets a plane hinged on
     # its crease and leaning in; where that plane meets the desk is the footprint edge
@@ -517,20 +548,11 @@ def _build(lay):
     back = LineString([foot_pts[0], foot_pts[1], foot_pts[2]])  # back-left, ridge, back-right
     strip = ops.substring(back, P["rear_strip_end"], back.length - P["rear_strip_end"])
     raw = footprint.buffer(-P["rim"], join_style="mitre").union(strip.buffer(P["rim"] + 1, cap_style="flat"))
-    full_panel = rnd(P["pocket_r"], raw).intersection(footprint)  # (the M6 panel: front feet keep their places on it)
     # M7: the rear pentagon. Its front corners (and V tip) rounded panel_front_r: the rabbet's inner corners, from below
-    # M7 (user): all four feet press into the body. The rear pair sits at the M6 back-corner screw spots; the panel's
-    # sides come in to rear_foot_clear inboard of them and run straight to the back edge (no wings to the corners):
-    # the rear band narrows with it, body fills the back corners beside it
-    fl_, fw_ = P["feet"]
-    old_path = full_panel.buffer(-P["ledge"] / 2).exterior  # the M6 corner screw spots: the feet stay near them
-    foot_at = lambda a, t: LineString([a, a + t * (fl_ - fw_)]).buffer(fw_ / 2, quad_segs=16)
-    rear_feet_at = []
-    for i in (0, 2):
-        t = np.subtract(foot_pts[1], foot_pts[i]); t = t / np.linalg.norm(t)
-        rear_feet_at.append((np.array(old_path.interpolate(old_path.project(Point(foot_pts[i]))).coords[0]), t))
-    xl = foot_at(*rear_feet_at[0]).bounds[2] + P["rear_foot_clear"] + P["panel_gap_print"]
-    xr = foot_at(*rear_feet_at[1]).bounds[0] - P["rear_foot_clear"] - P["panel_gap_print"]
+    # v2: the sides are panel_half_w either side of the ridge (they were set by the rear TPU feet, now bumpons in the
+    # body well outside them); the sides run straight to the back edge (no wings to the back corners), the rear band
+    # narrows with them, body fills the back corners beside it
+    xl, xr = ridge - P["panel_half_w"], ridge + P["panel_half_w"]
     r_ = P["panel_front_r"]
     raw0 = raw
     floor_at = lambda x, y: z_at(Ms["left" if x < ridge else "right"], FLOOR_W, x, y)
@@ -586,7 +608,6 @@ def _build(lay):
     backs = [min(ptsp, key=lambda q: math.hypot(q.x - x_, q.y - y_back)) for x_ in (xl, xr)]
     screws = backs  # bl, br (+ front-left, front-right below)
     insert_depths = [P["insert_hole_short"][1]] * 3
-    front_feet_at = [old_path.interpolate(old_path.project(Point(foot_pts[i]))) for i in (3, len(foot_pts) - 1)]
 
     # M4 rear lip: the panel strip rises up the rear face (z panel_t .. USB centre) as a visible band, the body cut
     # back to match (lip + print gap). It ends lip_end from the corners. M5 DFM: the body's lip pocket (cut from below)
@@ -624,9 +645,11 @@ def _build(lay):
     # M8 (user): the face runs down past the panel's back edge, so its field has no border there: it wraps onto the
     # bottom recess (clipped at z -1, the cutters' floor)
     face_ = Polygon([(x0_, -5), (x1_, -5), (x1_, z1_), (x1_ - band_run[1], z2_), (x0_ + band_run[0], z2_), (x0_, z1_)])
-    fld_ = face_.buffer(-bb_, join_style="mitre").buffer(-br_, quad_segs=16).buffer(br_, quad_segs=16).intersection(
-        box(-1e3, -1, 1e3, 1e3))
-    sw_ = max(P["usb_slot_w"], 0) / 2
+    # v2 (user): its side borders are the underside field's (panel_recess[1], 3.5), so the two borders run on into each other
+    # with no jog; the top and the diagonals keep band_recess[0]
+    fld_ = face_.buffer(-bb_, join_style="mitre").intersection(box(x0_ + P["panel_recess"][1], -1e3, x1_ - P["panel_recess"][1], 1e3)) \
+        .buffer(-br_, quad_segs=16).buffer(br_, quad_segs=16).intersection(box(-1e3, -1, 1e3, 1e3))
+    sw_ = P["usb_neck"][0] / 2  # v2: the frame goes round the visible neck
     frame_ = box(ridge - sw_, z1_, ridge + sw_, z2_ + 5).buffer(bb_, quad_segs=16)
     fld_ = fld_.difference(frame_)
     band_recess = {"left": fld_.intersection(box(-1e3, -1, ridge, 50)), "right": fld_.intersection(box(ridge, -1, 1e3, 50))}
@@ -657,8 +680,15 @@ def _build(lay):
     bx0, by0, bx1, _ = bay_full.bounds
     bay = rnd(P["pocket_r"], bay_full.intersection(box(bx0 - 1, by0 - 1, bx1 + 1, wall_y)))
     sw = max(P["usb_slot_w"], bx1 - bx0) / 2
-    # wider than the bay: round its inner end in plan (pocket_r) so the Ø6 cutter from below can make it
-    notch = box(ridge - sw, wall_y - P["pocket_r"], ridge + sw, back_mid[1] + 5 + P["pocket_r"]).buffer(
+    # v2: the notch is stepped: the chamber (usb_slot_w wide, holds the board's rear end) from its inner end to the neck
+    # step, which sits 0.25 mm behind the board's rear edge; then the neck (usb_neck[0] wide) out through the rear face.
+    # Rounded in plan (pocket_r) so the Ø6 cutter from below can make it; the chamber's rear corners round into the
+    # neck walls (a 2.5 mm step is narrower than R3), the board's R2 corners clear them
+    y_step = udb_c[1] + bd / 2 + 0.25
+    nw = P["usb_neck"][0] / 2
+    chamber_len = max(y_step - (wall_y - P["pocket_r"]), 2 * P["pocket_r"] + 0.6)  # (>= 2 R3 arcs + a flat: or the lobes round away)
+    notch = unary_union([box(ridge - sw, y_step - chamber_len, ridge + sw, y_step),
+                         box(ridge - nw, y_step - 1.0, ridge + nw, back_mid[1] + 5 + P["pocket_r"])]).buffer(
         -P["pocket_r"], quad_segs=16).buffer(P["pocket_r"], quad_segs=16)
     usb_centre_z = P["panel_t"] + uh / 2
     # M5 UDB rest pad: the slot roof comes down to the board's back face over the board's rear edge (behind the bay,
@@ -667,16 +697,16 @@ def _build(lay):
     udb["pad"] = {"x": [ridge - (sw - P["usb_r"][0]), ridge + (sw - P["usb_r"][0])],
                   "y": [wall_y + 0.3, udb_c[1] + bd / 2 - 0.25], "z": [z_top, P["panel_t"] + uh + 0.05]}
 
-    # feet (28 x 6 stadium bars, round ends = the pocket's tool radius): along the adjacent front/back edge from the
-    # M6 corner screw spots (the rear pair moved forward clear of the back strip). M7: all four in the body
-    fl_, fw_ = P["feet"]
-    feet, feet_pegs = [], []
-    for i, (q, toward) in enumerate(zip([Point(a) for a, _ in rear_feet_at] + front_feet_at, (foot_pts[1], foot_pts[1], v, v))):  # bl, br, fr, fl
-        t = np.subtract(toward, foot_pts[(0, 2, 3, len(foot_pts) - 1)[i]])
-        t = t / np.linalg.norm(t)
-        a = np.array([q.x, q.y])
-        feet.append(LineString([a, a + t * (fl_ - fw_)]).buffer(fw_ / 2, quad_segs=16))
-        feet_pegs.extend(Point(*(a + t * u_)) for u_ in (P["foot_peg"][2], fl_ - fw_))
+    # v2 bumpons: 4 adhesive 3M SJ5302 in shallow locating recesses, the centres inset bumpon["inset"] from the two
+    # desk-level footprint edges of each corner (the corners of the inset footprint): the front pair in the solid bezel
+    # outside the pockets, the rear pair in the body beside the panel (under the rear pockets, where the body is thick)
+    bd_ = P["bumpon"]
+    cs_ = list(footprint.buffer(-bd_["inset"], join_style="mitre").exterior.coords)[:-1]
+    lft_, rgt_ = sorted(cs_, key=lambda q: q[0])[:2], sorted(cs_, key=lambda q: -q[0])[:2]
+    bumpons = [{"x": round(q[0], 4), "y": round(q[1], 4), "d": bd_["recess_d"], "depth": bd_["recess_depth"],
+                "name": nm_} for pair_, nms_ in ((sorted(lft_, key=lambda q: -q[1]), ("rear left", "front left")),
+                                                  (sorted(rgt_, key=lambda q: -q[1]), ("rear right", "front right")))
+               for q, nm_ in zip(pair_, nms_)]
 
     # M7 panel recess (underside field), clear of the screw heads by panel_recess[3]
     rd_, rb_, rr_, rc_ = P["panel_recess"]
@@ -686,9 +716,13 @@ def _build(lay):
     # side borders stay straight and the back border is pushed clear; the field is then clipped to the panel
     qc_ = list(panel.exterior.coords)[:-1]
     ext_ = [(x_, y_ + 30.0) if y_ > panel.bounds[3] - 2.0 else (x_, y_) for x_, y_ in qc_]
-    panel_recess = Polygon(ext_).buffer(-rb_, join_style="mitre").buffer(-rr_, quad_segs=16).buffer(rr_, quad_segs=16)
-    panel_recess = panel_recess.intersection(panel.buffer(0.5, join_style="mitre"))
-    panel_recess = max(getattr(panel_recess, "geoms", [panel_recess]), key=lambda q: q.area)
+    recess_open = Polygon(ext_).buffer(-rb_, join_style="mitre")
+    # v2 (user): no taper: the side borders keep rb_ (3.5) to the back edge, where the rear-face field's side border (below) is
+    # the same width. The deep field is opened on this unclipped shape, so the back edge does not round its corner
+    # (that left a 0.4 deep tongue beside the outer seats)
+    recess_open = recess_open.buffer(-rr_, quad_segs=16).buffer(rr_, quad_segs=16)
+    panel_recess = recess_open.intersection(panel.buffer(0.5, join_style="mitre"))
+    panel_recess = max(getattr(panel_recess, "geoms", [panel_recess]), key=lambda q: q.area).simplify(0.004)  # (no 0.001 mm segments for Fusion's sketch)
 
     # wall thickness in plan (M4's lower band leans in, so the desk-level footprint is the outer face at z = 0)
     rab = rabbet["print"]
@@ -710,15 +744,12 @@ def _build(lay):
     bot_w = top_w - P["pcb_t"]
     layers = {"plate": [-pt, 0.0], "pcb": [bot_w, top_w], "switch_bottom": [top_w, 0.0],
               "switch_top": [0.0, P["switch_top_h"]], "keycap": [P["skirt_bottom_out"], P["skirt_bottom_out"] + P["keycap_h"]],
-              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w],
-              "snap_bar": [top_w, -pt - P["snap_bar_air"]], "snap_spine": [bot_w, top_w], "snap_leg": [bot_w - P["snap_drop"], bot_w]}
+              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w]}
     st, c, hw, U = P["stab"], P["cutout"] / 2, P["switch_body"] / 2, alice.U
     halves = {}
     for h, sgn in (("left", 1), ("right", -1)):
         M = Ms[h]
-        side = box(-1e4, -1e4, ridge - P["ridge_clear"], 1e4) if sgn > 0 else box(ridge + P["ridge_clear"], -1e4, 1e4, 1e4)
-        cut = lambda gap, w: to_local(M, w, opening.buffer(-gap).intersection(side))
-        pcb, plate = cut(P["snap_gap"], PCB_MID_W), cut(P["plate_wall_gap"], -pt / 2)
+        pcb, plate = frozen[h]["pcb"], frozen[h]["plate"]  # v2: frozen from v1 (the pocket walls were grown round them)
         keys = [{"label": o["key"]["label"], "x": round(o["x"], 4), "y": round(y_front - o["y"], 4),
                  "ang": round(-o["ang"], 4), "w": o["key"]["w"]} for o in caps if o["half"] == h]
         blockers = [[list(map(lambda c: round(c, 4), flip(c))) for c in alice.footprint(o)]
@@ -730,16 +761,11 @@ def _build(lay):
         posts = [Point(k["x"], k["y"]).buffer(POST_R) for k in keys]
         jst, pocket = place_jst(pcb, unary_union(sockets + posts), sgn)
         corners3 = [M @ [x, y, w, 1] for x, y in plate.exterior.coords for w in (-pt, 0.0)]
-        snaps = place_snaps(pcb, unary_union(sockets + posts + [pocket]),
-                            unary_union([key_rect(k, -c, -c, c, c) for k in keys]), unary_union(stabs), sgn)
-        # M6: the walls are vertical, the staple stands on the tilted PCB, so over its 7.3 mm height the gap runs
-        # ~0.4 .. 1.4 mm: each part is trimmed to stay snap_wall_air off the wall at both ends of its layer (where it
-        # would touch, the real silicone part is compressed against the wall)
-        inner = lambda w: to_local(M, w, opening.buffer(-P["snap_wall_air"]).intersection(side))
-        clip = lambda g_, lay: g_.intersection(inner(layers[lay][0])).intersection(inner(layers[lay][1]))
-        for q in snaps:
-            q["bar"], q["spine"] = clip(q["poly"], "snap_bar"), clip(q["spine"], "snap_spine")
-            q["legs"] = [clip(l_, "snap_leg") for l_ in q["legs"]]
+        # v2: the 5 C-clips of this half, at the given PCB-local edge points (v1 PCB frame: moved with the keys)
+        socks_real = [Polygon([(k["x"] + x * math.cos(math.radians(k["ang"])) - y * math.sin(math.radians(k["ang"])),
+                                k["y"] + x * math.sin(math.radians(k["ang"])) + y * math.cos(math.radians(k["ang"])))
+                               for x, y in SOCKET_REAL]) for k in keys]
+        clips = place_clips(pcb, [(x + frozen[h]["du"], y) for x, y in P["clip_pts"][h]], socks_real, stabs, pocket)
         halves[h] = {"matrix": M.tolist(), "keys": keys, "blockers": blockers, "pcb": pcb, "plate": plate,
                      "cutouts": [key_rect(k, -c, -c, c, c) for k in keys], "stabs": stabs,
                      "switches": [key_rect(k, -hw, -hw, hw, hw) for k in keys], "sockets": sockets,
@@ -748,12 +774,22 @@ def _build(lay):
                      "keycaps": [key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
                                  for k in keys],
                      "jst": jst, "jst_pocket": pocket,
-                     "snaps": snaps,
-                     "plate_bbox_world": [round(f(q[i] for q in corners3), 4) for f in (min, max) for i in range(3)]}
+                     "clips": clips,
+                     "plate_bbox_world": [round(f(q[i] for q in corners3), 4) for f in (min, max) for i in range(3)],
+                     # v2: what each flat placeholder's bodies must add up to in Fusion (mm3; fusion_build.check_volumes):
+                     # shredded bodies (a feature that touched more than its target) fail it loudly
+                     "expect_vol": {
+                         "Plate": round((plate.area - unary_union([key_rect(k, -c, -c, c, c) for k in keys] + list(stabs)).area) * pt, 2),
+                         "Pcb": round(pcb.area * P["pcb_t"], 2),
+                         "SocketKeepout": round(unary_union(sockets).area * P["socket_h"], 2),
+                         "JST": round(jst.area * P["jst"][2], 2), "JSTPlugPocket": round(pocket.area * P["jst"][2], 2),
+                         "SwitchBottom": round(unary_union([key_rect(k, -c, -c, c, c) for k in keys]).area * -layers["switch_bottom"][0], 2),
+                         "SwitchTop": round(unary_union([key_rect(k, -hw, -hw, hw, hw) for k in keys]).area * P["switch_top_h"], 2),
+                         "KeyEnvelope": round(unary_union([key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
+                                                           for k in keys]).area * P["keycap_h"], 2)}}
 
     # M5/M6 solid body. The pocket floor (op 2, from the top) is one plane per half parallel to its PCB with shallow
-    # relief grooves between the rows (below). Islands stand up from it: a pillar under each PCBsnap (its top
-    # pillar[2] under the PCB underside, i.e. just under the snap's lower lip, parallel to the PCB) and a boss over
+    # relief grooves between the rows (below) and a recess under each PCB clip. Islands stand up from it: a boss over
     # each insert that lies under a pocket (>= 5 mm of material over it). Underneath, the body is solid but for
     # the UDB bay and a cable channel per half (JST -> bay, cable_channel wide, chan_h tall), joined to the pocket by
     # a breakthrough round each JST plug pocket.
@@ -787,38 +823,64 @@ def _build(lay):
     floor = {h: {"open": o_, "open_run": dedup(o_.buffer(0.5, join_style="mitre")), "w": fw} for h, o_ in opens_h.items()}
     def floor_under(h, poly):  # the highest floor-plane point under poly
         return max(floor_z(h, x, y) for x, y in poly.exterior.coords)
+    # v2 C-clip recesses, in the floor plane's local coordinates (which are the PCB's: the plane is parallel to it): along
+    # the PCB edge's tangent recess[0] long, recess[1] wide measured in from the pocket wall (found along the edge normal
+    # in the floor plane, so the clip's spine meets it), the wall side ON the wall (it is cut to the pocket: no undercut),
+    # R clip_r corners (Ø3 tool). Its lead-in is a 45 deg taper: `mouth` = the recess grown by its depth (cut to the
+    # pocket), tapered in over that depth by Fusion; `*_w` are the same in the world, on the floor plane.
+    rl_, rw_, rd_ = P["clip_recess"]
+    cl_ = P["clip"]
+    wb_ = -(P["plate_to_pcb"] + P["pcb_t"])  # the PCB underside plane
+    w_bot = fw - rd_  # the recess bottom
+    w_slot = wb_ + cl_["slot"]  # the lip's underside (the PCB top is 0.1 over it: it grips)
+    w_top = w_slot + cl_["lip"]
+    for h, d in halves.items():
+        Mh = Ms[h]
+        o_levels = {w_: to_local(Mh, w_, opens_h[h]) for w_ in (fw, w_bot, wb_, w_top)}  # the (vertical) wall seen in each plane
+        A_fw = [Mh[0, 0], Mh[0, 1], Mh[1, 0], Mh[1, 1], Mh[0, 2] * fw + Mh[0, 3], Mh[1, 2] * fw + Mh[1, 3]]
+        for q in d["clips"]:
+            c_, t_, n_ = (np.array(q[k_]) for k_ in ("edge_pt", "t", "n"))
+            def wall_at(w_, s_=0.0):  # the wall's distance from the PCB edge along the normal, in the plane w_ (s_ along the edge)
+                c0_ = c_ + t_ * s_
+                hit = LineString([c0_, c0_ + n_ * 4.0]).intersection(o_levels[w_].exterior)
+                return min(Point(c0_).distance(p_) for p_ in getattr(hit, "geoms", [hit]))
+            dw_ = wall_at(fw)
+            fr_ = lambda s_, q_: tuple(c_ + t_ * s_ + n_ * q_)
+            # across the edge: from recess width less the nominal gap under the PCB (3.8 - 0.9 = 2.9: the 2.5 ledge, the 0.4 spare)
+            # out past the pocket wall (the tilt makes the wall's offset 0.3 .. 1.9 mm from the PCB edge at the floor plane), then
+            # cut to the pocket: the wall side is the wall itself (no undercut, no rounded corners there), the R clip_r corners
+            # are the inner ones
+            raw_x = Polygon([fr_(-rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, dw_ + 0.5),
+                             fr_(-rl_ / 2, dw_ + 0.5)])
+            rr_x = raw_x.buffer(-P["clip_r"], quad_segs=16).buffer(P["clip_r"], quad_segs=16)  # (corners past the wall: the wall side stays sharp)
+            mo_x = rr_x.buffer(rd_, quad_segs=16)  # the lead-in's top outline, uncut: Fusion tapers it 45 deg down to rr_x, then trims to the wall
+            rr_, mo_ = rr_x.intersection(o_levels[fw]), mo_x.intersection(o_levels[fw])
+            # the clip in its own frame (x = n out from the PCB edge, y = w up the PCB normal, z along the edge, centred):
+            # side profile, the spine face on the wall (wall_air off it; the wall is a plane: straight between two levels),
+            # the ledge under the PCB, the slot, the lip with its 30 deg lead-in, and a row of hex cells through it
+            sb_, st_ = wall_at(w_bot) - cl_["wall_air"], wall_at(w_top) - cl_["wall_air"]
+            ld_ = cl_["lead"] / math.tan(math.radians(cl_["lip_lead"]))
+            u_, lo_ = cl_["under"], cl_["lip_overlap"]
+            prof = [(-u_, w_bot), (sb_, w_bot), (st_, w_top), (-lo_, w_top), (-lo_, w_slot + cl_["lead"]), (-lo_ + ld_, w_slot), (0.0, w_slot),
+                    (0.0, wb_), (-u_ + ld_, wb_), (-u_, wb_ - cl_["lead"])]
+            cell, cw_ = cl_["lattice_cell"], cl_["lattice_wall"]
+            hy_ = cell / math.sqrt(3)  # pointy-top hexagon, across flats `cell` (along the edge), 2 hy_ vertex to vertex
+            nh_ = int((cl_["len"] - 2 * 0.7 + cw_) // (cell + cw_))  # 3 cells, 0.75 end walls
+            wc_ = (w_bot + wb_) / 2  # the middle of the ledge's height
+            hexes = [[(a0 + hy_ * math.cos(math.radians(60 * k_ + 30)), wc_ + hy_ * math.sin(math.radians(60 * k_ + 30))) for k_ in range(6)]
+                     for a0 in [(i_ - (nh_ - 1) / 2) * (cell + cw_) for i_ in range(nh_)]]
+            # the clip's plan (x out from the PCB edge, z along it) before the profile trims its sides: the recess's outline less the fit,
+            # and inside the pocket wall (seen at the clip's bottom and top levels) less wall_air: where the wall curves in along the
+            # clip's 10 mm (a pocket corner) the spine's end is trimmed to follow it, not left poking 0.1 into it
+            pl_ = rr_x.buffer(-cl_["fit"], quad_segs=16).intersection(o_levels[w_bot].buffer(-cl_["wall_air"], quad_segs=16)
+                                                                       ).intersection(o_levels[w_top].buffer(-cl_["wall_air"], quad_segs=16))
+            pl_ = max(getattr(pl_, "geoms", [pl_]), key=lambda g_: g_.area)  # (the piece the clip stands in)
+            plan_ = [(float((np.array(p_) - c_) @ n_), float((np.array(p_) - c_) @ t_)) for p_ in pl_.exterior.coords]
+            Lc = np.array([[n_[0], 0, n_[1], c_[0]], [n_[1], 0, -n_[0], c_[1]], [0, 1, 0, 0], [0, 0, 0, 1]])
+            q.update({"recess": rr_, "mouth": mo_, "wall_gap": float(dw_), "recess_w": affinity.affine_transform(rr_, A_fw),
+                      "mouth_w": affinity.affine_transform(mo_, A_fw), "mouth_ext_w": affinity.affine_transform(mo_x, A_fw), "recess_x": rr_x, "plan": plan_, "profile": prof, "lattice": hexes,
+                      "matrix": (Mh @ Lc).tolist(), "wall_n": [[w_, float(wall_at(w_))] for w_ in (w_bot, wb_, w_top)]})
     islands = []
-    sock_low = {h: unary_union([affinity.affine_transform(k, [Ms[h][0, 0], Ms[h][0, 1], Ms[h][1, 0], Ms[h][1, 1],
-                                                              Ms[h][0, 2] * w_ + Ms[h][0, 3], Ms[h][1, 2] * w_ + Ms[h][1, 3]])
-                                for k in d["sockets"] for w_ in (wb, wb - P["socket_h"])]).buffer(0.1) for h, d in halves.items()}
-    for h, d in halves.items():  # a pillar under each PCBsnap
-        M, o_ = Ms[h], opens_h[h]
-        A = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * wb + M[0, 3], M[1, 2] * wb + M[1, 3]]
-        for q in d["snaps"]:
-            sq = list(affinity.affine_transform(q["poly"], A).exterior.coords)[:4]
-            p0, p1, p3 = np.array(sq[0]), np.array(sq[1]), np.array(sq[3])
-            t = (p1 - p0) / np.linalg.norm(p1 - p0)
-            n_in = (p3 - p0) / np.linalg.norm(p3 - p0)  # from the snap's outer face inward
-            m = (p0 + p1) / 2
-            L_, D_ = P["pillar"][0] / 2, q["post_depth"]  # (from the wall; shorter where the legs are trimmed)
-            a0, a1 = -(P["snap_gap"] - P["snap_spine"] + 1.5), D_ - (P["snap_gap"] - P["snap_spine"])  # from the outer face: 1.5 into the wall, D_ in from the wall
-            rect = Polygon([m - t * L_ + n_in * a0, m + t * L_ + n_in * a0, m + t * L_ + n_in * a1, m - t * L_ + n_in * a1])
-            # M7: the post is a vertical prism, the sockets hang along the tilted normal: their bottoms reach further
-            # in plan than in the PCB frame, so the post's inner face steps back until 0.1 mm clear of them
-            while rect.intersects(sock_low[h]):
-                a1 -= 0.05
-                rect = Polygon([m - t * L_ + n_in * a0, m + t * L_ + n_in * a0, m + t * L_ + n_in * a1, m - t * L_ + n_in * a1])
-            rect = rect.buffer(-P["pillar_r"]).buffer(P["pillar_r"])
-            isl = dedup(merge(rect.intersection(o_), o_, P["pillar_fillet"]))
-            # its top is the half's PCB-underside plane moved down pillar[2] (parallel to the PCB); Fusion trims the
-            # prism to that plane
-            zs = [z_at(M, wb, x, y) - P["pillar"][2] for x, y in isl.exterior.coords]
-            er = isl.buffer(-0.6)
-            er = max(getattr(er, "geoms", [er]), key=lambda e_: e_.area)
-            ec = list(er.exterior.coords)
-            islands.append({"poly": isl, "z": [z_base - 1.0, max(zs) + 0.5], "kind": f"pillar {h} {q['side']}", "half": h, "fillet": P["pillar_fillet"],
-                            "w_top": wb - P["pillar"][2], "z_low": min(zs), "z_high": max(zs), "z_floor": floor_under(h, isl),
-                            "probes": [list(f(ec, key=k_)) for f in (min, max) for k_ in (lambda p: p[0] + p[1], lambda p: p[0] - p[1])]})
     bosses = [(f"insert boss {i + 1}", q.x, q.y, P["insert_hole"][0] / 2, P["panel_t"] + insert_depths[i])
               for i, q in enumerate(screws)]
     bosses += [(f"UDB insert boss {i + 1}", x, y, P["udb_insert"][0] / 2, udb["mount_z"][0] + P["udb_insert"][1])
@@ -844,8 +906,18 @@ def _build(lay):
                     eff = isl
                 eff = max(getattr(eff, "geoms", [eff]), key=lambda e: e.area) if not eff.is_empty else eff
                 if not eff.is_empty and eff.area > 2.0:
-                    # its flat top clears the tilted floor under it by >= 0.5 (a top grazing the floor left slivers)
-                    islands.append({"poly": dedup(eff), "z": [z_base - 1.0, max(top, floor_under(h, eff) + 0.5)], "kind": kind, "half": h,
+                    ztop_ = max(top, floor_under(h, eff) + 0.5)  # its flat top clears the tilted floor under it by >= 0.5 (a top grazing the floor left slivers)
+                    if kind.startswith("UDB"):
+                        # v2: a UDB boss stays >= 2 mm under the PCB everywhere: its flat top is level but the PCB tilts
+                        # down toward the outer wall, so where the PCB underside is lower than top + 2 (the boss's fillet
+                        # out to the pocket wall, 2.6 mm further out than in v1 once the halves moved apart) it is cut
+                        # back along that line (the rule is not relaxed); the part over the insert is well inside
+                        cut_ = eff.intersection(zp_above(Ms[h], ztop_ + 2.0 + 0.02))
+                        cut_ = max(getattr(cut_, "geoms", [cut_]), key=lambda e: e.area) if not cut_.is_empty else cut_
+                        if cut_.is_empty or not cut_.buffer(1e-6).contains(Point(x, y).buffer(ri + 2.0)):
+                            raise SystemExit(f"{kind}: cut back to 2 mm under the PCB, it no longer covers its insert")
+                        eff = cut_
+                    islands.append({"poly": dedup(eff), "z": [z_base - 1.0, ztop_], "kind": kind, "half": h,
                                     "z_floor": floor_under(h, eff)})
     # cable path under the floor: a breakthrough round each JST plug pocket, then a channel to the UDB bay
     bay_c = bay.centroid
@@ -869,11 +941,11 @@ def _build(lay):
         q["join_alt"] = dedup(Polygon(max(getattr(j_, "geoms", [j_]), key=lambda e: e.area).exterior))  # Fusion fallback
         # and the razor wedges where its R3 fillets run tangent into the wall (no Ø6 reaches them anyway) join it too
         loc = o_.intersection(j_.buffer(10.0))
-        rf = q.get("fillet", r3)  # (the pillars' R2: an R3 opening here would grow their fillets back to R3)
+        rf = r3
         air_ = loc.difference(j_).buffer(-rf, quad_segs=16).buffer(rf, quad_segs=16)
         j_ = j_.union(loc.difference(air_.buffer(0.05)).intersection(j_.buffer(rf))).buffer(0)  # (M6: 0.01 left 0.03-0.04 mm slots)
         # (M6: healed by a 1 um closing: a float-noise gap between the pocket part and its wall run made the largest
-        # piece below the pocket part alone, leaving a 0.03 mm slot between some pillars and the wall)
+        # piece below the pocket part alone, leaving a 0.03 mm slot between some bosses and the wall)
         j_ = j_.union(j_.buffer(0.5).difference(o_)).buffer(0.001, join_style="mitre").buffer(-0.001, join_style="mitre")  # (that fill runs into the wall too)
         q["join"] = dedup(Polygon(max(getattr(j_, "geoms", [j_]), key=lambda e: e.area).exterior))  # (pinholes filled)
     # (the channels run under the hung board, below its standoffs, and open into the bay)
@@ -882,7 +954,7 @@ def _build(lay):
     # relief grooves. M6 (user): one per key row, under that row's hotswap sockets: each socket keep-out (projected
     # along the PCB normal onto the floor plane) grown socket_margin, the gaps between neighbouring sockets in the row
     # closed, so it follows the row's curve and stagger; a semicircular notch at the row's middle key, R3 corners
-    # (>= Ø6 tool), stopping groove_wall short of the pocket walls. Kept out of the snap pillars, JST breakthroughs
+    # (>= Ø6 tool), stopping groove_wall short of the pocket walls. Kept out of the bosses, JST breakthroughs
     # and bosses (island_clear round them). None where its bottom would break the H_front rule; over the cable
     # channels and the UDB bay >= 3 mm of material is left (checked in the test)
     gw, gd = P["relief"]
@@ -907,9 +979,12 @@ def _build(lay):
         pz_ = rabbet["print"]
         rule_ok = zp_above(M, P["base_min_groove"] + gd - fw + wb).difference(pz_).union(
             zp_above(M, P["panel_t"] + P["base_min_groove"] + gd - fw + wb).intersection(pz_))
+        # v2 (user, approved map): the grooves may run into the JST breakthroughs / cable channels (no keep-out: the 3 mm
+        # rule over the channels is tested); R groove_r (2) corners; clip_keep (1.0) off each C-clip's mouth chamfer, which
+        # lets the top row stay one groove past the clip (R3 and 0.5 left a 43-51 mm2 fragment split by a 0.1-0.5 mm land)
         keep_out = unary_union([q["poly"].buffer(P["island_clear"]) for q in islands if q["half"] == h] +
-                               [unary_union(stubs).buffer(P["island_clear"])])
-        gro = opn3(gro.intersection(rule_ok).difference(keep_out))
+                               [q["mouth_w"].buffer(P["clip_keep"], quad_segs=16) for q in d["clips"]])
+        gro = (lambda r_: r_.buffer(-P["groove_r"], quad_segs=16).buffer(P["groove_r"], quad_segs=16))(gro.intersection(rule_ok).difference(keep_out))
         gro = unary_union([q for q in getattr(gro, "geoms", [gro]) if q.area > 20])
         gro = shapely.remove_repeated_points(gro, 0.02).buffer(0)  # (M6: drops the 0.01 mm jogs the booleans leave: sliver faces)
         floor[h].update({"grooves": dedup(gro), "groove_w": [fw - gd, fw]})  # off the walls: no shared faces
@@ -933,8 +1008,21 @@ def _build(lay):
     v_ = min((q for q in grid if fld.contains(q) and insert_ok(q.x, q.y)), key=lambda q: q.distance(apex))
     fronts, screw_front_offset = [v_], [round(v_.distance(apex), 1)]
     screws = backs + fronts
+    # v2 seat pads: the field is only screw_seat[0] deep within screw_head / 2 + screw_seat[1] of each screw (the pad
+    # merges into the border), panel_recess[0] deep elsewhere: the deep part, opened with R3 (the Ø6 flat end mill),
+    # is cut after the seat-depth field. The countersink cone starts at the seat depth, so it leaves what v1 had.
+    pads = unary_union([Point(q.x, q.y).buffer(P["screw_head"] / 2 + P["screw_seat"][1], quad_segs=32) for q in screws])
+    panel_recess_deep = recess_open.difference(pads).buffer(-P["panel_recess"][2], quad_segs=16).buffer(
+        P["panel_recess"][2], quad_segs=16).intersection(panel_recess).simplify(0.004)  # (opened before the back-edge clip: no tongue)
     # M7: the cavity is no longer one void: the insert wall that matters is to the voids cut from below (channels, bay)
     walls["insert_to_cavity"] = min(unary_union([chan, bay]).distance(q) for q in screws) - P["insert_hole"][0] / 2
+    # v2: each C-clip's recess (and its chamfered mouth) lies on the floor plane, so the body under it must keep
+    # clip_floor_min - recess depth: checked here (a local exception to the base_min rule, which counts the floor plane)
+    for h, d in halves.items():
+        for q in d["clips"]:
+            q["floor_z_min"] = min(z_at(Ms[h], fw, x, y) for x, y in q["mouth"].exterior.coords)
+            if q["floor_z_min"] < P["clip_floor_min"] - 1e-6:
+                raise SystemExit(f"{h} clip {q['name']}: the floor under its recess is {q['floor_z_min']:.2f} mm above the desk (< {P['clip_floor_min']})")
     cavity_steps = {"channels": channels, "chan": chan, "chan_z": [-1.0, P["panel_t"] + P["chan_h"]],
                     "stubs": unary_union(stubs), "floor": floor, "islands": islands}
 
@@ -942,16 +1030,15 @@ def _build(lay):
     return {
         "params": P, "layers": layers, "udb": udb, "socket_box": SOCKET, "floor_w": FLOOR_W, "pcb_mid_w": PCB_MID_W,
         "ridge_x": ridge, "y_front": y_front, "lift": lift, "h_front": min(heights["front_left"], heights["front_right"]),
-        "max_height": max(heights.values()), "heights": heights, "floor_min_z": low + lift, "cap_gap": cap_gap, "web_min": web_min, "web_sym": web_sym,
+        "max_height": max(heights.values()), "heights": heights, "heights_cut": heights_cut, "max_height_cut": max_cut,
+        "rear_cut": rear_cut, "floor_min_z": low + lift, "cap_gap": cap_gap, "web_min": web_min, "web_sym": web_sym,
         "outline_size": [maxx - minx, maxy - miny],
         "key_gap": key_gap, "v_offset": sharp[3][0] - ridge, "v_offset_equal_bezels": v_off0, "front_bezels": front_bezels,
         "_shapes": {"envelopes": env, "opening": opening, "outline": outline, "outline_sharp": outline_sharp,
                     "footprint": footprint, "panel": panel, "rabbet": rabbet, "cavity": cavity},
-        "screws": [[round(p.x, 4), round(p.y, 4)] for p in screws], "insert_depths": insert_depths, "screw_front_offset": screw_front_offset, "panel_recess": panel_recess, "panel_shift": panel_shift, "band_recess": band_recess,
+        "screws": [[round(p.x, 4), round(p.y, 4)] for p in screws], "insert_depths": insert_depths, "screw_front_offset": screw_front_offset, "panel_recess": panel_recess, "panel_recess_deep": panel_recess_deep, "pocket_growth": [pocket_growth.area, pocket_growth_max], "panel_shift": panel_shift, "band_recess": band_recess,
         "cavity_steps": cavity_steps, "bay": bay, "bay_z": [-1.0, z_top + P["udb_mount"][1]], "notch": notch, "notch_z": [-1.0, P["panel_t"] + uh],
-        "usb_centre": [ridge, usb_centre_z], "feet": feet, "feet_plug": [f.buffer(P["foot_fit"], quad_segs=16) for f in feet],
-        "peg_holes": [q.buffer(P["foot_peg"][0] / 2, quad_segs=16) for q in feet_pegs],
-        "pegs": [q.buffer(P["foot_peg"][0] / 2 + P["foot_fit"], quad_segs=16) for q in feet_pegs], "walls": walls, "lower_band": lower_band,
+        "usb_centre": [ridge, usb_centre_z], "bumpons": bumpons, "walls": walls, "lower_band": lower_band,
         "panel_lean": panel_lean, "rabbet_lean": rabbet_lean, "lip": lip, "lip_pocket": lip_pocket,
         "rear_zone_panel": rear_zone["panel"], "rear_zone_body": rear_zone["body"],
         "lip_z": [P["panel_t"], lip_top], "lip_ends": band_ends, "lip_run": band_run, "lip_pocket_z": [P["panel_t"] - 0.01, lip_top + P["panel_gap_print"]],
@@ -997,7 +1084,7 @@ if __name__ == "__main__":
           f"back centre {hh['back_centre']:.2f} mm")
     print("heights: " + ", ".join(f"{k} {v:.2f}" for k, v in hh.items()))
     print(f"centre web between the openings, narrowest: {g['web_min']:.2f} mm")
-    print(f"halves spread {P['half_spread']} mm; ridge at mid key gap {g['key_gap'][0]:.2f} .. {g['key_gap'][1]:.2f}; "
+    print(f"halves spread {P['half_spread']} mm; ridge at the R2 midpoint (key gap {g['key_gap'][0]:.2f} .. {g['key_gap'][1]:.2f}); "
           f"outline centre {g['outline_offset']:+.2f} mm off it; side bezels {P['bezel_side']} each; "
           f"V front point {g['v_offset']:+.2f} mm off the ridge")
     print(f"outline {g['outline_size'][0]:.2f} x {g['outline_size'][1]:.2f} mm, {len(g['screws'])} screws -> {out}")
@@ -1008,6 +1095,6 @@ if __name__ == "__main__":
     print("walls (plan, mm): " + ", ".join(f"{k} {v:.2f}" for k, v in g["walls"].items()))
     for h, d in g["halves"].items():
         jc = d["jst"].centroid
-        print(f"{h}: {len(d['stabs'])} stab cutouts, JST at ({jc.x:.1f}, {jc.y:.1f}), snaps " +
-              ", ".join(f"{s['side']}" +
-                        f" {s['length']:.0f} mm, {s['corner_dist']:.1f} mm from corners" for s in d["snaps"]))
+        print(f"{h}: {len(d['stabs'])} stab cutouts, JST at ({jc.x:.1f}, {jc.y:.1f}), {len(d['clips'])} C-clips (floor under their recesses "
+              f"{min(q['floor_z_min'] for q in d['clips']):.2f} mm, edge deviation <= {max(q['edge_dev'] for q in d['clips']):.2f})")
+    print(f"pocket grown round the frozen v1 PCB / plate: {g['pocket_growth'][0]:.2f} mm2, at most {g['pocket_growth'][1]:.2f} mm out")

@@ -15,7 +15,7 @@ import os
 import adsk.core
 import adsk.fusion
 
-CASE = os.path.expanduser("~/Documents/Development/alice-case/case")
+CASE = os.path.expanduser("~/Documents/Development/personal/alice-case/case")
 OUT = os.path.join(CASE, "out")
 COUP = os.path.join(OUT, "coupons")
 PROTO = os.path.join(OUT, "prototype")
@@ -30,7 +30,7 @@ RIDGE = g["ridge_x"]
 DOWEL = (3.0, 0.1, 6.0)  # dowel Ø, clearance per side (hole Ø3.2), hole depth each side (10 mm dowels)
 BED = P["bed"]
 PANEL_SPLIT = 30.0  # panel cut, mm right of the ridge: the panel bridges the body seam
-SRC = "Alice Case"
+SRC = "Alice Case v2"
 
 
 def log(*a):
@@ -146,10 +146,9 @@ def W(m, u, v, w):
 
 # ---------------------------------------------------------------- step 1: copy the parts out of Alice Case
 PARTS = {  # export component <- (source component, body names or None for all)
-    "Body": ("Case", ["Body"]), "Panel": ("Case", ["Panel"]), "Feet": ("Case", ["Foot1", "Foot2", "Foot3", "Foot4"]),
+    "Body": ("Case", ["Body"]), "Panel": ("Case", ["Panel"]),
     "PlateL": ("PlateL", None), "PlateR": ("PlateR", None), "PcbL": ("PcbL", None), "PcbR": ("PcbR", None),
-    "SnapsL": ("SnapsL", None), "SnapsR": ("SnapsR", None), "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]),
-    "PCBsnapTPU": ("PCBsnapTPU", None),
+    "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]), "TpuClip": ("TpuClip", None),  # v2: no feet or PCB snaps
 }
 
 
@@ -182,8 +181,8 @@ def step():
     log("wrote", os.path.basename(path))
     for name in PARTS:
         fn = name.lower()
-        fn = fn[:-1] + "_left" if name in ("PlateL", "PcbL", "SnapsL") else fn[:-1] + "_right" if name in (
-            "PlateR", "PcbR", "SnapsR") else "pcbsnap_tpu" if name == "PCBsnapTPU" else fn
+        fn = fn[:-1] + "_left" if name in ("PlateL", "PcbL") else fn[:-1] + "_right" if name in (
+            "PlateR", "PcbR") else "tpu_clip" if name == "TpuClip" else fn
         path = os.path.join(OUT, "step", fn + ".step")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         assert em.execute(em.createSTEPExportOptions(path, comp(name)))
@@ -520,30 +519,6 @@ def proto():
         s = "L" if h == "left" else "R"
         pb = body("PrintPlate" + s)
         mesh(pb, os.path.join(PROTO, f"plate_{h}.stl"))
-    # 4 TPU feet (pad down, pegs up, as in the model) in a row
-    fb, y = [], 0.0
-    for b in comp("Feet").bRepBodies:
-        t = to_origin(cp(b), 0, y)
-        y = bbox(t)[4] + 5
-        fb.append(t)
-    info("foot", fb[0])
-    for b in fb[1:]:  # one multi-lump body: a component with several bodies did not export
-        op(fb[0], b, "Union")
-    b = put("FeetPrint", fb[:1], hidden=True).bRepBodies.item(0)
-    info("feet_tpu_x4", b)
-    mesh(b, os.path.join(PROTO, "feet_tpu_x4.stl"))
-    # 8 TPU PCBsnaps (spine's wall face down, as modelled)
-    sb, y = [], 0.0
-    for i in range(8):
-        t = to_origin(cp(body("PCBsnapTPU")), 0, y)
-        y = bbox(t)[4] + 4
-        sb.append(t)
-    info("pcbsnap_tpu", sb[0])
-    for b in sb[1:]:
-        op(sb[0], b, "Union")
-    b = put("SnapsPrint", sb[:1], hidden=True).bRepBodies.item(0)
-    info("pcbsnap_tpu_x8", b)
-    mesh(b, os.path.join(PROTO, "pcbsnap_tpu_x8.stl"))
 
 
 # ---------------------------------------------------------------- step 7: whole body, whole panel, switch fit strip -> prints/
@@ -588,3 +563,23 @@ def whole():
         info(f, b)
         mesh(b, os.path.join(PRINTS, f + ".stl"))
     fit_strip()
+
+
+def v2_prints(out=None):
+    """v2: whole body and panel plus the TPU clip (single and 10-up plate) -> prints/v2/ (run after copy())."""
+    out = out or os.path.join(PRINTS, "v2")
+    os.makedirs(out, exist_ok=True)
+    for n, f in (("Body", "case_body"), ("Panel", "bottom_panel"), ("TpuClip", "tpu_clip")):
+        b = put(n + "Print", [to_origin(cp(body(n)))], hidden=True).bRepBodies.item(0)
+        info(f, b)
+        mesh(b, os.path.join(out, f + ".stl"))
+    cl, y = [], 0.0
+    for i in range(10):  # one multi-lump body: a component with several bodies did not export
+        t = to_origin(cp(body("TpuClip")), 0, y)
+        y = bbox(t)[4] + 4
+        cl.append(t)
+    for b in cl[1:]:
+        op(cl[0], b, "Union")
+    b = put("ClipsPrint", cl[:1], hidden=True).bRepBodies.item(0)
+    info("tpu_clip_x10", b)
+    mesh(b, os.path.join(out, "tpu_clip_x10.stl"))

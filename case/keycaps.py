@@ -25,7 +25,7 @@ import adsk.core
 import adsk.fusion
 
 CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else \
-    os.path.expanduser("~/Documents/Development/alice-case/case")
+    os.path.expanduser("~/Documents/Development/personal/alice-case/case")
 JSON = os.path.join(CASE, "out", "case_geometry.json")
 LAYOUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "layouts", "layout2.json")
 MM = 0.1
