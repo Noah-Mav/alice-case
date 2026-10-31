@@ -60,3 +60,22 @@ So 4 FRONT + 6 BACK. The two differ only in the outer (wall-side) face, which le
 - **Gone from v1:** no TPU feet and no PCB snaps. The feet are replaced by 4 bumpon recesses (8 mm round, 0.5 mm deep) for **3M SJ5302** bumpons, 4 needed.
 - **Clips are untested.** Print one `tpu_clip_front.stl` and one `tpu_clip_back.stl` first and check the grip on the 1.6 mm PCB edge and the fit in a recess before printing the plates.
 - The v1 files above stay as they are so older links keep working.
+
+## Print files v3
+
+Exported from the Fusion v3 build by `v3_prints()` in `case/fusion_export.py`, into `prints/v3/`. Millimetres, lowest point on z 0.
+
+| File | Material | Orientation / supports |
+|---|---|---|
+| `v3/case_body.stl` | PLA or PETG | One piece, bottom down (as modelled). 286.5 x 105.9 x 39.1 mm. Supports under the panel-recess area. |
+| `v3/bottom_panel.stl` | PLA or PETG | Variant 1, as v2 (recessed underside field): one piece, outer (desk) face down, no supports. 212.2 x 55.2 mm. |
+| `v3/bottom_panel_flat.stl` | PLA or PETG | Variant 2: flat underside with no border, screw heads flush; the back keeps its bordered field. Outer face down, no supports. Print one or the other. |
+| `v3/tpu_clip.stl` | TPU 95A | The one C-clip for all 10 spots, 10 x 6.5 x 3.2 mm, already laid on its flat outer face: **no supports**. |
+| `v3/tpu_clip_x10.stl` | TPU 95A | 10 clips on one plate, same orientation. |
+| `v3/dummy_pcb_left.stl`, `v3/dummy_pcb_right.stl` | PLA or PETG | v3 dummy PCBs (the shared PCB / plate edge), printed top face down. |
+| `v3/dummy_plate_left.stl`, `v3/dummy_plate_right.stl` | PLA or PETG | v3 dummy plates, flat, 1.5 mm, 14.05 mm switch cutouts. |
+
+- **One clip everywhere.** The v3 pocket walls are square to the PCB, so the PCB edge is 0.9 mm from the wall at every spot and one clip fits all 10 (v2 needed FRONT and BACK variants).
+- **Printing the clip:** on its outer face the slot and lip stand straight up, the 45 deg end chamfers rise off the bed, and the three lattice cells are vertical holes. Use 2 perimeters at 0.4 mm (the lattice struts are 0.8 wide, the end walls 0.6) and 0.2 mm layers.
+- **Lattice:** flat-top hexagons, so the walls between cells are hourglass struts that flex as the PCB is pressed (v2's cells left straight columns). Untested: print one clip first and check the grip on the 1.6 mm PCB edge, the fit in a recess and the give under a keypress.
+- **New PCB / plate edge.** The PCB and plate now share one edge (the outer edge of the two v1 outlines): the PCB is up to 0.54 mm bigger along the back and the centre side. Key, socket, stab and JST positions are unchanged, so update only the board outline (Edge.Cuts) in the real PCB. The v1 dummies do not fit the new pocket the same way; print the v3 ones. The switch fit strip is unchanged.

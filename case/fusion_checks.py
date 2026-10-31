@@ -2,7 +2,8 @@
 Set WHICH before running, e.g. WHICH = ["m3"] (any of m3, m4, m5, step; default all). SKIP_STANDOFF skips the slow UDB standoff probe
 (run fusion_check_standoffs.py on its own). Results go to case/out/fusion_build.log."""
 import os
-CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.expanduser("~/Documents/Development/personal/alice-case/case")
+CASE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else next(
+    (d for d in (os.path.expanduser("~/Projects/alice-case/case"), os.path.expanduser("~/Documents/Development/personal/alice-case/case")) if os.path.isdir(d)))
 import adsk.core, adsk.fusion, json, time, traceback
 def run(_c):
     path = os.path.join(CASE, 'fusion_build.py')

@@ -18,6 +18,11 @@ Output is printed and also appended to case/out/fusion_build.log (a slow STEP im
 v2 (2026-10): every run builds a NEW document, "Alice Case v2" (DOC_NAME; there is no INTO_ACTIVE: v1 stays untouched).
 The PCB is held by 10 printable TPU C-clips (two variants: FRONT x4, BACK x6) in recesses in the pocket floors (build_clip, clip_recesses), not by snaps;
 the feet are 4 bumpon recesses (3M SJ5302); the rear peak is cut by one plane (rear_cut); see case/out/v2_changes.md.
+
+v3 (2026-10-31): builds "Alice Case v3". The pocket walls are square to each half's PCB (tilted_prism: the void tools are
+built flat in the half's own frame and moved with its matrix), snap_gap (0.9) from the one PCB / plate edge (the union of the
+v1 outlines) all round, floor to top; ONE printed clip for all 10 spots ("TpuClipAll"). The pockets are machined in two tilted setups,
+one per half (each half's PCB plane level); the undercut check accepts those directions ('tilt L' / 'tilt R').
 """
 import json
 import math
@@ -28,13 +33,15 @@ import adsk.core
 import adsk.fusion
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out") if "__file__" in globals() else \
-    os.path.expanduser("~/Documents/Development/personal/alice-case/case/out")
+    next((d for d in (os.path.expanduser("~/Projects/alice-case/case/out"),  # (v3: Windows)
+                      os.path.expanduser("~/Documents/Development/personal/alice-case/case/out")) if os.path.isdir(d)),
+         os.path.expanduser("~/Projects/alice-case/case/out"))
 JSON = os.path.join(OUT, "case_geometry.json")
 UDB_STEP = os.path.join(OUT, "uDB-C3-3D-model.step")  # optional; the box placeholder is always built
 # STEP frame -> UDB frame (board centre, board bottom at z=0, receptacle at +y), measured from that file, mm
 UDB_STEP_SHIFT = (-75.004, 64.793, 0.01)
 MM = 0.1
-DOC_NAME = "Alice Case v2"
+DOC_NAME = "Alice Case v3"
 ANGLES = {"typing_angle", "tent", "lower_cant", "clip_lip_lead"}
 UNITLESS = {"stab_min_w"}
 
@@ -106,6 +113,24 @@ def slab(comp, name, polys, w, outer=False, opacity=None):
     return f
 
 
+def tilted_prism(comp, name, polys, w, m):
+    """v3: a prism square to a half's PCB: polys (local u, v) extruded w[0] .. w[1] along the normal, built flat in comp's XY
+    and moved by that half's local -> world matrix m (comp must sit at the origin). Returns the body."""
+    f = slab(comp, name, polys, w)
+    bs = sorted((f.bodies.item(i) for i in range(f.bodies.count)), key=lambda b_: -b_.volume)
+    b = bs[0]
+    if len(bs) > 1:  # (a near-zero segment at a bulge junction splits the sketch: zero-area profiles beside the main one, a slit if left out)
+        cut(comp, b, bs[1:], op=adsk.fusion.FeatureOperations.JoinFeatureOperation)
+    coll = adsk.core.ObjectCollection.create()
+    coll.add(b)
+    inp = comp.features.moveFeatures.createInput2(coll)
+    inp.defineAsFreeMove(matrix(m))
+    comp.features.moveFeatures.add(inp).name = "Tilt" + name
+    b = comp.bRepBodies.itemByName(name) or b
+    b.name = name
+    return b
+
+
 def part(parent, name, m, *slabs, ctx=None):
     """A component placed with matrix m and built flat in its own coordinates from slabs
     (name, polys, layer[, outer[, opacity]]). Returns the root-context occurrence (ctx: its root-level parent).
@@ -136,7 +161,7 @@ def appearance(name, rgb):
 
 def build_half(root, g, h):
     """M2: plate, PCB (+ socket keep-outs, JST header and its plug pocket), switches, keycap envelopes, and (v2) the
-    5 TPU C-clips on the PCB's edge: the printed FRONT or BACK variant at each spot (build_clip, the same data as TpuClipFront / Back)."""
+    5 TPU C-clips on the PCB's edge: the printed clip at each spot (build_clip, the same data as TpuClipAll; v2 had FRONT / BACK)."""
     d, L, s = g["halves"][h], g["layers"], "L" if h == "left" else "R"
     asm = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     asm.component.name = "Left" if h == "left" else "Right"
@@ -238,11 +263,12 @@ def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None, marks=0,
 
 
 def build_tpu_clip(root, g):
-    """v2: the two printable TPU C-clips, each one watertight body: "TpuClipFront" (4: spots 1 and 5 per half) and "TpuClipBack"
-    (6: 2, 3, 4), exactly the geometry placed at their spots in the halves (g["clip_variants"]): 10 long, slot 1.5 for the 1.6 PCB,
-    2.5 under it, a 1.0 lip 1.5 over it with a 30 deg lead-in, an outer face leaning with its wall (FRONT 1.76 at the bottom -> 0.85
-    at the lip top; BACK 0.0 -> 0.85), a lattice (2.3 cells, 0.8 walls) in the ledge, and 1 (FRONT) or 2 (BACK) dimples in the lip
-    top; 6.5 high (the PCB's underside is y = 0, the clip rises 2.5 above it and 4.0 below). Placed off the case."""
+    """The printable TPU C-clips, one watertight body per variant in g["clip_variants"] (v3: one, "TpuClipAll", for all 10
+    spots; v2 had TpuClipFront x4 / TpuClipBack x6), exactly the geometry placed at the spots in the halves: 10 long, slot 1.5
+    for the 1.6 PCB, 2.5 under it, a 1.0 lip 1.5 over it with a 30 deg lead-in, the outer face square to the PCB (v3: the wall
+    is) with 45 deg end chamfers, a lattice of 3 flat-top hex cells (0.8 hourglass struts between them) in the ledge, no
+    dimples; 6.5 high (the PCB's underside is y = 0, the clip rises 2.5 above it and 4.0 below). Placed off the case.
+    Printed on its outer face (fusion_export.face_down): no supports."""
     P = g["params"]
     wb = g["floor_w"] + P["floor_air"]  # the PCB underside plane
     x0 = min(p[0] for p in g["outline"]) - 40.0
@@ -256,7 +282,7 @@ def build_tpu_clip(root, g):
         b = occ.component.bRepBodies.item(0)
         log(f"{nm}: {occ.component.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.2f} mm3, "
             f"{P['clip']['len']} long x {max(p[1] for p in prof) - min(p[1] for p in prof):.1f} high x "
-            f"{max(p[0] for p in prof) - min(p[0] for p in prof):.1f} deep; face {v['xb']} -> {v['xt']}; "
+            f"{max(p[0] for p in prof) - min(p[0] for p in prof):.2f} deep; face {v['xb']} -> {v['xt']}; "
             f"{sum(len(d_) for d_ in (v['spots']['left'], v['spots']['right']))} needed")
         out[vn] = occ
     return out
@@ -493,18 +519,19 @@ def lip_ramps(c, g, dz, zone, z0=-2.0):
     return tools
 
 
-def band_recess(c, g):
+def band_recess(c, g, key="band_recess", target="Panel"):
     """M7: the 0.4 mm recessed field on the panel's rear face (edge + band), one per rear lean plane: its (x, z)
     outline extruded through Y, kept only within the recess depth behind that plane, cut from the Panel. Needs a side
-    setup when machined (the face is near-vertical); the undercut check lists those faces as 'side'."""
+    setup when machined (the face is near-vertical); the undercut check lists those faces as 'side'.
+    v3: key / target "band_recess_flat" / "PanelFlat" for the flat-bottomed panel (bordered along the bottom edge too)."""
     P = g["params"]
     tbm = adsk.fusion.TemporaryBRepManager.get()
     lb = g["lower_band"]
     tools = []
     for idx, side in ((0, "left"), (1, "right")):
-        poly = g["band_recess"][side]
+        poly = g[key][side]
         sk = c.sketches.add(c.xZConstructionPlane)
-        sk.name = "BandRecess" + side
+        sk.name = "BandRecess" + target + side
         pts = [sk.modelToSketchSpace(P3(x, 0, z)) for x, z in poly]
         lines, prev, first = sk.sketchCurves.sketchLines, None, None
         for i in range(len(pts)):
@@ -532,11 +559,11 @@ def band_recess(c, g):
         c.features.removeFeatures.add(prism)
         bf = c.features.baseFeatures.add()
         bf.startEdit()
-        c.bRepBodies.add(tp, bf).name = "BandRecessTool" + side
+        c.bRepBodies.add(tp, bf).name = "BandRecessTool" + target + side
         bf.finishEdit()
-        tools.append(c.bRepBodies.itemByName("BandRecessTool" + side))
-    cut(c, c.bRepBodies.itemByName("Panel"), tools)
-    log(f"M7: band recess {P['panel_recess'][0]} mm on the panel's rear face (2 fields, USB frame)")
+        tools.append(c.bRepBodies.itemByName("BandRecessTool" + target + side))
+    cut(c, c.bRepBodies.itemByName(target), tools)
+    log(f"M7: band recess {P['panel_recess'][0]} mm on the {target}'s rear face (2 fields, USB frame)")
 
 
 def clip_recesses(c, g):
@@ -555,7 +582,8 @@ def clip_recesses(c, g):
     for h in ("left", "right"):
         X = h[0].upper()
         m = g["halves"][h]["matrix"]
-        wall = slab(c, "ClipWall" + X, many(g["cavity_steps"]["floor"][h]["open"]), [1.0, hi + 5]).bodies.item(0)
+        f_ = g["cavity_steps"]["floor"][h]  # v3: the square wall below the step (the clips sit under it)
+        wall = tilted_prism(c, "ClipWall" + X, [f_["pocket_low"]], [f_["w"] - 20, P["lip"] + 1.0], m)
         for q in g["halves"][h]["clips"]:
             try:
                 face = None  # (re-found each time: a cut renumbers the Body's faces)
@@ -618,7 +646,9 @@ def build_case(root, g):
     for h, f in cs["floor"].items():
         X = h[0].upper()
         # (M7: the void tools start at z 1.0, below the lowest groove plane over the solid front; the planes trim them)
-        one("Open" + X, many(f["open"]), [1.0, hi + 5])
+        # v3: the pocket prism is square to the PCB, the PCB / plate edge's offset floor to just past the facet (a taller
+        # prism leans out past the front)
+        tilted_prism(c, "Open" + X, [f["pocket_low"]], [f["w"] - 20, P["lip"] + 1.0], g["halves"][h]["matrix"])
         one("Shelf" + X, many(f["open_run"]), [1.0, hi + 5])  # floor plane .. groove plane, less the grooves
         gr = slab(c, "Grooves" + X, many(f["grooves"]), [1.0, hi + 5])
         for i in range(gr.bodies.count):
@@ -794,9 +824,9 @@ def build_case(root, g):
     if bad_:
         log(f"BUILD WARNING: these tool cuts failed: {bad_}")
     body = B("Body")
-    # opening chamfer: per facet, its chamfer_top outline drawn on the facet (projected straight down, as the
-    # pocket walls are vertical) and cut 45 deg inward, 0.25 mm past the depth (the facet normal leans ~8 deg, which
-    # moves the tool's foot ~0.12 mm), so it meets the wall exactly at the chamfer
+    # opening chamfer: per facet, its chamfer_top outline drawn on the facet (projected straight down: the JSON gives it on
+    # the facet's plane, grown in that plane) and cut 45 deg inward along the facet normal, which (v3) is the square wall's
+    # own direction, so it meets the wall exactly at the chamfer; 0.25 mm past the depth as in v2
     ext = c.features.extrudeFeatures
     for poly in g["chamfer_top"]:
         planes = [(f, f.pointOnFace, f.evaluator.getNormalAtPoint(f.pointOnFace)[1]) for f in top_faces(body, g)]
@@ -826,6 +856,22 @@ def build_case(root, g):
     log(f"M4: R{P['top_round']} top round ({len(rim_edges)} edges), {P['opening_chamfer']} mm x 45 deg opening "
         f"chamfer on {len(g['chamfer_top'])} openings")
     panel = B("Panel")
+    # v3 (user): a second panel, PanelFlat (hidden, same place): no underside field, so the countersinks drop by the seat
+    # depth (the heads flush with the flat underside), and its rear field is bordered along the bottom edge too
+    flat_ = tbm.copy(panel)
+    for i in range(len(g["screws"])):
+        cs_ = tbm.copy(B(f"Countersink{i + 1}"))
+        mv_ = adsk.core.Matrix3D.create()
+        mv_.translation = adsk.core.Vector3D.create(0, 0, -P["screw_seat"][0] * MM)
+        tbm.transform(cs_, mv_)
+        tbm.booleanOperation(flat_, cs_, adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    bf4 = c.features.baseFeatures.add()
+    bf4.name = "PanelFlatBase"
+    bf4.startEdit()
+    c.bRepBodies.add(flat_, bf4)
+    bf4.finishEdit()
+    fb_ = bf4.bodies.item(0)
+    fb_.name, fb_.isLightBulbOn = "PanelFlat", False
     cut(c, panel, [B(f"Countersink{i + 1}") for i in range(len(g["screws"]))])
     # v2: the shallow recessed field on the panel's outer face: screw_seat deep all over it (the seat pad round each screw
     # is what is left of that), then panel_recess[0] deep where the pads are not (R3 corners: the Ø6 flat end mill)
@@ -833,6 +879,7 @@ def build_case(root, g):
         f_ = slab(c, nm, many(g[key]), [-1.0, zmax])
         cut(c, B("Panel"), [f_.bodies.item(i) for i in range(f_.bodies.count)])
     band_recess(c, g)
+    band_recess(c, g, "band_recess_flat", "PanelFlat")
     clip_recesses(c, g)
     cut(c, B("Body"), [B(f"Bumpon{i + 1}") for i in range(len(g["bumpons"]))])
     log(f"v2: {len(g['bumpons'])} bumpon recesses Ø{P['bumpon']['recess_d']} x {P['bumpon']['recess_depth']}, panel field "
@@ -853,7 +900,12 @@ def build_case(root, g):
     # neck's whole length, so its inner 0.75 mm (from the step into the chamber's side) is cut away again below: the
     # fillet never comes within 1.0 mm of the board's rear edge, which sits 0.25 mm behind the step
     roof, floor = slot_edges(B("Body"), g["notch_z"][1], (min(nx), max(nx)) + tuple(nk)), slot_edges(B("Panel"), P["panel_t"], nk + [min(nx), max(nx)])
-    for nm_, es_, r_ in (("roof", roof, P["usb_r"][0]), ("floor", floor, P["usb_r"][1])):
+    flat_floor = lambda: slot_edges(B("PanelFlat"), P["panel_t"], nk + [min(nx), max(nx)])  # (found after the fillets before it)
+    for nm_, es_, r_ in (("roof", roof, P["usb_r"][0]), ("floor", floor, P["usb_r"][1]), ("flat floor", flat_floor, P["usb_r"][1])):
+        es_ = es_() if callable(es_) else es_
+        if not es_:
+            log(f"BUILD WARNING: USB slot {nm_}: no edges found")
+            continue
         try:
             edge_round(c, es_, r_, chain=False)
         except RuntimeError as e:  # v2: the neck's edges end at the step into the chamber; log rather than lose the build
@@ -928,13 +980,26 @@ def check_m3(design, g, halves, udb, case):
     ok["interference"] = not hits
     log(f"CHECK interference, case Body + Panel vs {nplace} placeholder bodies + UDB: {len(hits)} pair(s) {hits[:20]} -> "
         f"{'PASS' if not hits else 'FAIL'}")
+    # v3: the flat-bottomed panel variant (hidden, in the Panel's place) against the same bodies
+    ents = adsk.core.ObjectCollection.create()
+    for o in (halves["left"][0], halves["right"][0], udb, body, B("PanelFlat")):
+        ents.add(o)
+    inp = design.createInterferenceInput(ents)
+    inp.areCoincidentFacesIncluded = False
+    res = design.analyzeInterference(inp)
+    hits = [(r.entityOne.name, r.entityTwo.name, round(r.interferenceBody.volume * 1000, 3))
+            for r in (res.item(i) for i in range(res.count))]
+    hits = [h for h in hits if "PanelFlat" in (h[0], h[1])]
+    ok["interference flat panel"] = not hits
+    log(f"CHECK interference, PanelFlat vs Body + placeholders + UDB: {len(hits)} pair(s) {hits[:20]} -> {'PASS' if not hits else 'FAIL'}")
 
     # v2 the PRINTED variants at their spots (the bodies in the halves are the TpuClipFront / Back geometry, not per-spot fit bodies):
     # none touches the Body (>= wall_air - 0.02 from it, i.e. no collision with the pocket wall or the recess walls, the 0.2 fit
     # and the 0.1 air), the tightest spot of each variant is at 0.1, and each meets its PCB only in the lip's 0.1 grip
     # (the interference volume <= 1.6 mm3: 1.5 over the edge x 0.1 x 10)
     grip = 0.0
-    nvar = {"front": 0, "back": 0}
+    nvar = {vn: 0 for vn in g["clip_variants"]}
+    want_n = {vn: len(v["spots"]["left"]) + len(v["spots"]["right"]) for vn, v in g["clip_variants"].items()}
     for h, (asm, occs) in halves.items():
         for q in g["halves"][h]["clips"]:
             cb = occs[f"clip{q['name']}"].component.bRepBodies.item(0).createForAssemblyContext(occs[f"clip{q['name']}"])
@@ -947,12 +1012,12 @@ def check_m3(design, g, halves, udb, case):
             inp_.areCoincidentFacesIncluded = False
             r_ = design.analyzeInterference(inp_)
             grip = max([grip] + [r_.item(i).interferenceBody.volume * 1000 for i in range(r_.count)])
-    ok["variants"] = nvar == {"front": 4, "back": 6} and 0 < grip <= 1.6
-    log(f"CHECK printed clip variants at their spots: FRONT {nvar['front']} + BACK {nvar['back']} = 10; interference with the Body (above), "
+    ok["variants"] = nvar == want_n and sum(nvar.values()) == 10 and 0 < grip <= 1.6
+    log(f"CHECK printed clip variants at their spots: {nvar} (want {want_n}); interference with the Body (above), "
         f"largest PCB grip overlap {grip:.2f} mm3 (want 0 < v <= 1.6) -> {'PASS' if ok['variants'] else 'FAIL'}")
     # v2 PCB-to-wall gap: from the PCB edge at each C-clip's centre, at the PCB's underside, mid and top, to the case Body: at
-    # least pcb_wall_min (0.80) at all three; the pocket is vertical and the PCB tilted, so it is 0.8 .. 1.3 over the clips
-    worst = 9.0
+    # least pcb_wall_min (0.80) at all three; v3: the wall is square to the PCB, so all three are snap_gap (0.9, +- 0.05)
+    worst, most = 9.0, 0.0
     for h, (asm, occs) in halves.items():
         d, M = g["halves"][h], g["halves"][h]["matrix"]
         for q in d["clips"]:
@@ -961,10 +1026,11 @@ def check_m3(design, g, halves, udb, case):
             for w in (g["pcb_mid_w"] - P["pcb_t"] / 2, g["pcb_mid_w"], g["pcb_mid_w"] + P["pcb_t"] / 2):
                 X, Y, Z = (sum(M[r][k] * v for k, v in enumerate((ux, uy, w))) + M[r][3] for r in range(3))
                 gaps.append(mm(P3(X, Y, Z), body))
-            worst = min(worst, min(gaps))
+            worst, most = min(worst, min(gaps)), max(most, max(gaps))
             log(f"  clip {h} {q['name']}: PCB-to-wall gap bottom/mid/top {gaps[0]:.3f} / {gaps[1]:.3f} / {gaps[2]:.3f} mm")
-    ok["pcb_gap"] = worst >= P["pcb_wall_min"] - 0.02
-    log(f"CHECK PCB-to-wall gap at the clips >= {P['pcb_wall_min']} (-0.02): smallest {worst:.3f} mm -> {'PASS' if ok['pcb_gap'] else 'FAIL'}")
+    ok["pcb_gap"] = worst >= P["pcb_wall_min"] - 0.02 and most <= P["snap_gap"] + 0.05
+    log(f"CHECK PCB-to-wall gap at the clips: {worst:.3f} .. {most:.3f} mm (want >= {P['pcb_wall_min']} - 0.02, v3: <= {P['snap_gap']} + 0.05) "
+        f"-> {'PASS' if ok['pcb_gap'] else 'FAIL'}")
 
     # USB opening (notch faces in the body) vs the receptacle box
     rec = udb.component.bRepBodies.itemByName("USBReceptacle").createForAssemblyContext(udb).boundingBox
@@ -1193,8 +1259,14 @@ def check_m4(g, case):
     # their points pointOnFace picks decides whether their normal lies in the band)
     in_slot = lambda f: f.boundingBox.minPoint.x / MM >= g["ridge_x"] - P["usb_slot_w"] / 2 - 0.1 and \
         f.boundingBox.maxPoint.x / MM <= g["ridge_x"] + P["usb_slot_w"] / 2 + 0.1 and f.boundingBox.maxPoint.z / MM <= g["notch_z"][1] + 0.05
+    # (v3: on the outside only: the square pocket walls at the back and the ridge side face slightly down by design)
+    ext_ = case.component.bRepBodies.itemByName("Exterior")
+    def outside(f):
+        p, n = f.pointOnFace, f.evaluator.getNormalAtPoint(f.pointOnFace)[1]
+        q = adsk.core.Point3D.create(p.x + n.x * 0.005, p.y + n.y * 0.005, p.z + n.z * 0.005)
+        return ext_ is None or ext_.pointContainment(q) == adsk.fusion.PointContainment.PointInsidePointContainment
     strays = [f for f in body.faces if f.tempId not in lean_faces and f.tempId not in blends
-              and -0.5 < nz(f, f.pointOnFace) < -0.01 and not in_slot(f)]
+              and -0.5 < nz(f, f.pointOnFace) < -0.01 and not in_slot(f) and outside(f)]
     # one plane per ring edge, less the collinear ones (a horizontal crease makes the back one plane)
     n_ring = len({tuple(round(v, 6) for v in n_) for n_ in g["lower_band"]["normals"]})
     ok_l = len(lean_faces) == n_ring and all(abs(a - P["lower_cant"]) <= 1 for a in angles) and not strays
@@ -1308,7 +1380,10 @@ def check_m5(g, case):
     reaches every sample ('top' / 'bottom' / 'both') or each sample by one of them ('split'). Exterior Body faces
     must also follow the crease rule: above the crease from +Z, below from -Z. The Panel is its own part with its own
     two sides. A face with a single unreachable sample on its boundary (a ray grazing a neighbour) is 'graze' (info).
-    Rays are zero-width: tool radii are the internal-radius check's job (case/geometry.py corner table)."""
+    Rays are zero-width: tool radii are the internal-radius check's job (case/geometry.py corner table).
+    v3: the square pocket walls undercut a vertical tool at the back and the ridge side, so the pockets are cut in two more
+    setups, each half's PCB plane level (3+2): a face no +-Z op reaches passes as 'tilt L' / 'tilt R' when that half's
+    normal reaches every sample (or 'split' when the four directions share them)."""
     c = case.component
     B = c.bRepBodies.itemByName
     ring = g["lower_band"]["crease"]
@@ -1341,15 +1416,18 @@ def check_m5(g, case):
         on = lambda p, n, e: f.body.pointContainment(adsk.core.Point3D.create(p.x + n.x * e, p.y + n.y * e, p.z + n.z * e))
         return [(p, n) for p, n in out if on(p, n, -0.002) == IN_ and on(p, n, 0.002) != IN_] or out[:1]
 
-    def reach(body, p, n, dz):
-        if n.z * dz < -1e-4:
+    def reach(body, p, n, dz):  # dz: +1 / -1 (straight up / down) or a unit direction (v3: a half's normal)
+        d = (0.0, 0.0, dz) if isinstance(dz, (int, float)) else dz
+        if n.x * d[0] + n.y * d[1] + n.z * d[2] < -1e-4:
             return False
         for e in (0.003, 0.01):  # 0.03 mm, then 0.1 mm off the face
-            o = adsk.core.Point3D.create(p.x + n.x * e, p.y + n.y * e, p.z + n.z * e + dz * e)
-            hits = c.findBRepUsingRay(o, adsk.core.Vector3D.create(0, 0, dz), adsk.fusion.BRepEntityTypes.BRepFaceEntityType, 1e-5, True)
+            o = adsk.core.Point3D.create(p.x + n.x * e + d[0] * e, p.y + n.y * e + d[1] * e, p.z + n.z * e + d[2] * e)
+            hits = c.findBRepUsingRay(o, adsk.core.Vector3D.create(*d), adsk.fusion.BRepEntityTypes.BRepFaceEntityType, 1e-5, True)
             if not any(h.body.name == body.name for h in hits):
                 return True
         return False
+    tilt = {"tilt L": tuple(r[2] for r in g["halves"]["left"]["matrix"][:3]),
+            "tilt R": tuple(r[2] for r in g["halves"]["right"]["matrix"][:3])}
 
     def pip(pt, ring):
         x, y, c_ = pt[0], pt[1], False
@@ -1388,6 +1466,10 @@ def check_m5(g, case):
             miss = sum(not (a or b_) for a, b_ in zip(up, dn))
             op = "both" if all(up) and all(dn) else "top" if all(up) else "bottom" if all(dn) else \
                 "split" if not miss else "graze" if miss == 1 and len(S) >= 10 else "NONE"
+            if op in ("NONE", "graze") and name == "Body":  # v3: the tilted pocket setups
+                tl_ = {k_: [reach(body, p, n, d_) for p, n in S] for k_, d_ in tilt.items()}
+                hit_ = [a or b_ or any(t_[i] for t_ in tl_.values()) for i, (a, b_) in enumerate(zip(up, dn))]
+                op = next((k_ for k_, t_ in tl_.items() if all(t_)), "split" if all(hit_) else op)
             if op == "NONE":  # M6: a ray that only grazes a wall (the sample sits on the wall's line, e.g. a boss top
                 # meeting it): every unreachable sample is reached once the ray starts 0.03 mm aside, out of the body
                 IN0 = adsk.fusion.PointContainment.PointInsidePointContainment
@@ -1450,7 +1532,7 @@ def _run(_context):
     else:
         doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
         try:
-            doc.saveAs(DOC_NAME, app.data.activeProject.rootFolder, "v2 build (case/fusion_build.py)", "")
+            doc.saveAs(DOC_NAME, app.data.activeProject.rootFolder, "v3 build (case/fusion_build.py)", "")
         except Exception as e:  # (a new, empty document does not save from the API: save it by hand under that name)
             log(f"note: document not saved as {DOC_NAME!r} yet ({str(e)[:80]}); File > Save it under that name")
     design = adsk.fusion.Design.cast(app.activeProduct)

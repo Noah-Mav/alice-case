@@ -72,21 +72,20 @@ for M in Ms.values():
     steep = math.degrees(math.acos(math.cos(math.radians(P["typing_angle"])) * math.cos(math.radians(P["tent"]))))
     assert abs(math.degrees(math.acos(R[2, 2])) - steep) < 1e-6
 
-# §6.2: the opening holds every envelope with >= 1.5 mm along its edges and >= 0.85 mm at its corners.
-opening, edge = s["opening"], s["opening"].boundary
-assert len(s["envelopes"]) == len(G.alice.keycaps(placed))
-for e in s["envelopes"]:
-    assert opening.contains(e)
-    ring = e.exterior.coords
-    assert all(edge.distance(Point(p)) >= 0.85 for p in ring)
-    for a, b in zip(ring, ring[1:]):
-        n = max(int(math.dist(a, b)), 1)
-        pts = [np.add(a, np.subtract(b, a) * t / n) for t in range(n + 1)]
-        assert all(edge.distance(Point(p)) >= 1.5 - 1e-6 for p in pts
-                   if min(math.dist(p, c) for c in ring) >= 1.5)
-
 def world(M, w, poly):  # local (u, v) on the plane w -> world plan
     return affinity.affine_transform(poly, [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * w + M[0, 3], M[1, 2] * w + M[1, 3]])
+
+
+# §6.2 (v3): the opening is the top edge of the two square-walled pockets (each the frozen PCB grown snap_gap, local), so
+# the M6 envelope rule (1.5 mm round the plan envelopes) is replaced by the real-cap check below (cap_gap_min)
+opening, edge = s["opening"], s["opening"].boundary
+assert len(s["envelopes"]) == len(G.alice.keycaps(placed))
+pockets = {h: g["cavity_steps"]["floor"][h]["pocket_low"] for h in g["halves"]}
+for h, d in g["halves"].items():
+    top_ = world(Ms[h], P["lip"], pockets[h])
+    assert [o for o in opening.geoms if o.intersects(top_)][0].symmetric_difference(top_).area < 1e-3, h
+    for k in d["keys"]:  # every key's whole cap footprint (its 19.05 grid square) stays inside the pocket
+        assert pockets[h].contains(Polygon(corners(k["x"], k["y"], k["w"] * G.alice.U - 0.9, G.alice.U - 0.9, k["ang"]))), (h, k["label"])
 
 
 # §6.6: each plate and PCB outline holds every switch body, each PCB every hotswap socket; both stay on their side.
@@ -99,30 +98,30 @@ for h, d in g["halves"].items():
         sock = Polygon([(k["x"] + x * math.cos(a) + y * math.sin(a), k["y"] + x * math.sin(a) - y * math.cos(a))
                         for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))])
         assert d["pcb"].contains(sock), (h, k["label"])
-    # the gaps hold at both faces in plan, despite the tilt (each outline is inset at its own mid-height)
-    # (v2: the PCB and plate are frozen from v1, the pocket grew round them: the wall keeps v1's 0.80 / 0.906 at least)
-    for poly, w0, w1, gap in ((d["plate"], -P["plate_t"], 0.0, P["plate_wall_min"]),
-                              (d["pcb"], G.PCB_MID_W - P["pcb_t"] / 2, G.PCB_MID_W + P["pcb_t"] / 2, P["pcb_wall_min"])):
-        for w in (w0, w1):
-            pw = world(Ms[h], w, poly)
-            assert opening.contains(pw) and min(edge.distance(Point(q)) for q in pw.exterior.coords) >= gap - 2e-3, (h, w)
+    # v3: the walls are square to the PCB, so the gaps are plain local distances, the same in every plane: the PCB is
+    # snap_gap from the wall all round (the pocket is that offset), the plate at least plate_wall_min
+    # (one straight wall floor to top: the PCB and the plate share one edge, so both are snap_gap from it, as is every clip)
+    pl_ = pk_ = pockets[h]
+    assert d["pcb"].equals(d["plate"]), h
+    for q in d["clips"]:
+        assert abs(pl_.exterior.distance(Point(q["edge_pt"])) - P["snap_gap"]) < 0.02, (h, q["name"])
+    assert pl_.symmetric_difference(d["pcb"].buffer(P["snap_gap"], quad_segs=32)).area < 2.0, h  # (the R0.5 closing only)
+    assert pl_.contains(d["pcb"]) and abs(pl_.exterior.distance(d["pcb"]) - P["snap_gap"]) < 5e-3, (h, pl_.exterior.distance(d["pcb"]))
+    assert pk_.contains(d["plate"]) and pk_.exterior.distance(d["plate"]) >= P["plate_wall_min"] - 5e-3, h
     xw = [(Ms[h] @ [u, v, G.PCB_MID_W, 1])[0] for u, v in d["pcb"].exterior.coords]
     assert (max(xw) <= g["ridge_x"] - P["ridge_clear"] + 1e-6) if h == "left" else (min(xw) >= g["ridge_x"] + P["ridge_clear"] - 1e-6)
 
 
-# v2 (user): the same dummy PCB and plate as v1. Their outlines (and so the holes, which hang on the keys) are v1's, moved
-# along u with the keys: identical to case/frozen_v1.json, and to the v1 checkpoint JSON where it is present.
 v1_ck = Path(__file__).resolve().parent / "checkpoints" / "v1" / "case_geometry.json"
 v1_json = G.json.loads(v1_ck.read_text()) if v1_ck.exists() else None
+# v3 (user): the PCB and the plate share one edge, the union of the v1 outlines (case/frozen_v1.json), moved along u with
+# the keys (the holes hang on the keys, which are as laid out)
 for h, d in g["halves"].items():
     du_h = d["keys"][0]["x"] - G.FROZEN[h]["keys"][0][0]
+    want = affinity.translate(G.edge_v3(h), du_h, 0)
     for nm_ in ("pcb", "plate"):
-        for src_, pts_ in (("frozen_v1.json", G.FROZEN[h][nm_]), ("v1 checkpoint", v1_json["halves"][h][nm_] if v1_json else None)):
-            if pts_ is None:
-                continue
-            want = affinity.translate(Polygon(pts_), du_h, 0)
-            assert d[nm_].equals_exact(want, 1e-9), (h, nm_, src_)  # same vertices, same outline
-            assert abs(d[nm_].area - Polygon(pts_).area) < 1e-6
+        assert d[nm_].equals_exact(want, 1e-9), (h, nm_)
+        assert want.buffer(0.01).contains(affinity.translate(Polygon(G.FROZEN[h][nm_]), du_h, 0)), (h, nm_)  # v1's lies inside (less 0.01 repeats)
     # every key keeps its place on the frozen PCB (same relative positions, angles, widths as v1)
     for k, k1 in zip(d["keys"], G.FROZEN[h]["keys"]):
         assert abs(k["x"] - du_h - k1[0]) < 2e-3 and abs(k["y"] - k1[1]) < 2e-3 and abs(k["ang"] - k1[2]) < 2e-3, (h, k["label"])
@@ -166,17 +165,17 @@ def floor_z(lift, X, Y):  # straight from each floor plane's point and normal, i
 
 
 need = P["base_min"]  # M7: solid front base (over the panel the floor rule is checked below)
-verts = [p for q in getattr(opening, "geoms", [opening]) for p in q.exterior.coords]
+verts = [p for f_ in g["cavity_steps"]["floor"].values() for p in f_["open"].exterior.coords]  # v3: where the square wall meets the floor
 low = lambda lift: min(floor_z(lift, x, y) for x, y in verts)
 assert abs(g["lift"] / P["lift_step"] - round(g["lift"] / P["lift_step"])) < 1e-9
 assert low(g["lift"]) >= need and low(g["lift"] - P["lift_step"]) < need
 assert abs(low(g["lift"]) - g["floor_min_z"]) < 1e-9
 # M7: over the (rear) panel the floor keeps panel_t + floor_above_panel; in front of it the body is solid to the desk
-ov = opening.intersection(s["panel"].buffer(P["panel_gap_print"]))
+ov = unary_union([opening] + [f_["open"] for f_ in g["cavity_steps"]["floor"].values()]).intersection(s["panel"].buffer(P["panel_gap_print"]))
 assert min(floor_z(g["lift"], x, y) for q in getattr(ov, "geoms", [ov]) for x, y in q.exterior.coords) >= \
     P["panel_t"] + P["floor_above_panel"]
 # M7: real bottomed-out Cherry caps (tapered, skirt_bottom_out .. lip) keep the artisan gap to the opening (M6 envelope)
-assert g["cap_gap"] >= P["artisan_gap"], g["cap_gap"]
+assert g["cap_gap"] >= P["cap_gap_min"], g["cap_gap"]  # v3: 1.1 (v2's 1.5 needs the back wall off the frozen PCB)
 
 
 # M2 parts. Plate cutouts (switch + §4 stab: 2 per key >= 2u) sit inside the plate with a web between them.
@@ -212,8 +211,8 @@ for h, d in g["halves"].items():
     real_socks = unary_union([Polygon([(k["x"] + x * math.cos(math.radians(k["ang"])) - y * math.sin(math.radians(k["ang"])),
                                         k["y"] + x * math.sin(math.radians(k["ang"])) + y * math.cos(math.radians(k["ang"])))
                                        for x, y in G.SOCKET_REAL]) for k in d["keys"]])
-    o_h = [o for o in opening.geoms if (o.centroid.x < g["ridge_x"]) == (h == "left")][0]
-    o_at = lambda w_: G.to_local(Ms[h], w_, o_h)  # the vertical wall seen in the plane w (the PCB frame)
+    f_h = g["cavity_steps"]["floor"][h]
+    o_at = lambda w_: f_h["pocket_low"]  # v3: the square wall, the same outline in every plane w (the PCB frame)
     o_loc = o_at(G.FLOOR_W)
     w_bot = G.FLOOR_W - D_c
     w_pcb = G.FLOOR_W + (P["floor_air"])  # the PCB underside
@@ -285,8 +284,11 @@ for h, d in g["halves"].items():
         q["_air"], q["_fit"] = o_min, fit_
         assert len(q["lattice"]) == 3 and all(len(hx) == 6 for hx in q["lattice"])
         hx_w = [p_[1] for p_ in q["lattice"][0]]
-        assert abs((max(hx_w) - min(hx_w)) - cl["lattice_cell"] * 2 / math.sqrt(3)) < 1e-9  # 2.3 across flats
-        assert abs(q["lattice"][1][0][0] - q["lattice"][0][0][0] - (cl["lattice_cell"] + cl["lattice_wall"])) < 1e-9  # 0.8 walls
+        # v3: flat-top cells (hourglass struts between them), 0.8 at each waist, lattice_end at the two ends
+        hx_a = [[p_[0] for p_ in hx] for hx in q["lattice"]]
+        assert all(abs(max(hx_w) - min(hx_w) - (max(a_) - min(a_)) * math.sqrt(3) / 2) < 1e-9 for a_ in hx_a[:1])  # flat top: across flats is vertical
+        assert all(abs(min(hx_a[i_ + 1]) - max(hx_a[i_]) - cl["lattice_wall"]) < 1e-9 for i_ in range(len(hx_a) - 1))  # 0.8 waists
+        assert abs(min(hx_a[0]) + cl["len"] / 2 - cl["lattice_end"]) < 1e-9 and abs(cl["len"] / 2 - max(hx_a[-1]) - cl["lattice_end"]) < 1e-9
         assert min(hx_w) - w_bot >= 0.6 and slot_lo - max(hx_w) >= 0.6, (h, q["name"])  # the cells sit between a floor and the ledge top
         assert q["floor_z_min"] >= P["clip_floor_min"] - 1e-6 and abs(q["floor_z_min"] - min(
             G.z_at(Ms[h], G.FLOOR_W, x_, y_) for x_, y_ in mo_.exterior.coords)) < 1e-9
@@ -296,21 +298,19 @@ for h, d in g["halves"].items():
         assert np.allclose(Mc @ [0, 0, 0, 1], Ms[h] @ [q["edge_pt"][0], q["edge_pt"][1], 0, 1], atol=1e-6)
     for a_, b_ in zip(d["clips"], d["clips"][1:]):
         assert a_["mouth"].distance(b_["mouth"]) > 3.0  # no two recesses meet
-# the two printed variants cover the 10 spots exactly once (FRONT 4: spots 1 and 5 per half; BACK 6: 2, 3, 4), the outer face bears on the wall
-# (0.1 air at the tightest point over its spots, <= 0.5 gap along the face at the front and back-edge spots; the inner spot 2: <= 0.6)
+# v3: ONE printed clip for all 10 spots (the walls are square to the PCB, snap_gap off it everywhere): its outer face is square
+# too (xb = xt = snap_gap - wall_air) and keeps wall_air (0.1) to the wall at every spot, all along its face
 cv = g["clip_variants"]
-assert set(cv) == {"front", "back"}
-cover = sorted((v_["name"], h_, i_) for v_ in cv.values() for h_ in ("left", "right") for i_ in v_["spots"][h_])
-assert [(c_[1], c_[2]) for c_ in cover if c_[0] == "front"] == [("left", 1), ("left", 5), ("right", 1), ("right", 5)] and len(cover) == 10 and \
-    len({(c_[1], c_[2]) for c_ in cover}) == 10 and sum(c_[0] == "back" for c_ in cover) == 6, cover
-for n_, v_ in cv.items():
-    airs = [q["_air"] for h_, d_ in g["halves"].items() for q in d_["clips"] if q["variant"] == n_]
-    assert min(airs) <= P["clip"]["wall_air"] + 0.01 and min(airs) >= P["clip"]["wall_air"] - 1e-3, (n_, min(airs))  # 0.1 air at its tightest point
-    for k_, (g0, g1) in v_["gaps"].items():
-        assert g0 >= P["clip"]["wall_air"] - 1e-3 and g1 <= (0.6 if k_.endswith(" 2") else 0.5), (n_, k_, g0, g1)
-    assert v_["marks"] == (1 if n_ == "front" else 2) and v_["xb"] > v_["xt"] - 1e-9 if n_ == "front" else v_["xb"] < v_["xt"]  # the lean of its wall
-print("clip variants:", {n_: (v_["xb"], v_["xt"], round(min(g_[0] for g_ in v_["gaps"].values()), 2), round(max(g_[1] for g_ in v_["gaps"].values()), 2),
-                              {k_: g_ for k_, g_ in v_["gaps"].items() if k_.endswith(" 2")}) for n_, v_ in cv.items()})
+assert set(cv) == {"all"}
+v_ = cv["all"]
+assert sorted((h_, i_) for h_ in ("left", "right") for i_ in v_["spots"][h_]) == [(h_, i_) for h_ in ("left", "right") for i_ in range(1, 6)]
+# (square: xb = xt; at most 0.15 under snap_gap - wall_air: the back spots sit on the R100 back edge, 0.1 of bow over 10 mm)
+assert abs(v_["xb"] - v_["xt"]) < 1e-9 and 0 <= P["snap_gap"] - P["clip"]["wall_air"] - v_["xb"] <= 0.15, (v_["xb"], v_["xt"])
+airs = [q["_air"] for d_ in g["halves"].values() for q in d_["clips"]]
+assert P["clip"]["wall_air"] - 1e-3 <= min(airs) <= P["clip"]["wall_air"] + 0.02, min(airs)  # (0.01 steps, both ends)
+for k_, (g0, g1) in v_["gaps"].items():
+    assert P["clip"]["wall_air"] - 1e-3 <= g0 <= g1 <= 0.3, (k_, g0, g1)  # bears at every spot, top to bottom (centre line; 0.1 at the tightest)
+print("clip:", (v_["xb"], v_["xt"]), "gaps to the wall", v_["gaps"])
 
 # §6.9 UDB (M5: hung upside down from the body): centred on the ridge, back face udb_air under the slot roof,
 # receptacle on its underside, face <= 1.5 behind the rear; two front standoffs into the bay ceiling.
@@ -546,32 +546,34 @@ assert P["lower_cant"] == 12.0 and P["panel_shift"] == 48.0 and P["half_spread"]
 assert P["typing_angle"] == 8.0 and P["tent"] == 5.0 and P["base_min"] == 3.5 and P["floor_air"] == 3.5
 hh = g["heights"]
 assert abs(hh["front_left"] - 16.2) < 0.4 and abs(hh["front_right"] - 16.1) < 0.4 and abs(hh["front_v"] - 26.4) < 0.4, hh
-assert abs(hh["back_left"] - 28.8) < 0.6 and abs(hh["back_right"] - 28.8) < 0.6 and abs(hh["back_centre"] - 41.4) < 0.3, hh
+# (v3: the outline sits ~1.3 mm further forward with the square walls' top edge: back centre 41.35 -> 41.07)
+assert abs(hh["back_left"] - 28.8) < 0.6 and abs(hh["back_right"] - 28.8) < 0.6 and abs(hh["back_centre"] - 41.1) < 0.3, hh
 assert abs(hh["back_left"] - hh["back_right"]) < 1e-3  # symmetric about the centreline (the front pair differs by the 0.1 bezel)
 assert abs(hh["front_left"] - hh["front_right"]) < 0.3
 assert g["floor_min_z"] >= P["base_min"] - 1e-9  # the front base rule (the clips' recesses: their own check above)
 # the two front faces (level crease) lean lower_cant from the upright: the plane's normal is lower_cant above horizontal
 for n_ in lb_["normals"][3:5]:
     assert abs(math.degrees(math.asin(abs(n_[2]) / np.linalg.norm(n_))) - P["lower_cant"]) < 0.01, n_
-# the end creases are level: the back vertices' crease height equals the front's (lower_back 0.477; the spec's 0.467 left 0.41 mm)
+# the end creases are level: the back vertices' crease height equals the front's (lower_back 0.473 in v3, 0.477 in v2; the spec's 0.467 left 0.41 mm)
 assert abs(lb_["crease"][0][2] - lb_["crease"][3][2]) < 0.02 and abs(lb_["crease"][2][2] - lb_["crease"][3][2]) < 0.02, lb_["crease"]
 # 2: the centreline is the R2 midpoint: both R2 rows end the same distance from it, so do the outer case edges
 r2_in = g["ridge_x"] - max(r2["left"])
 assert abs(r2_in - (min(r2["right"]) - g["ridge_x"])) < 1e-9 and 8.1 < r2_in < 8.3, r2_in  # ~8.2 mm (the spec's 8.24)
-assert 141.9 < g["ridge_x"] - ob_[0] < 143.0, g["ridge_x"] - ob_[0]  # both outer edges ~142.4 mm from it (spec ~142.52)
-assert 13.5 <= g["web_min"] <= 14.5, g["web_min"]  # the B-N web ~14 mm (spec ~14.1; the pocket grew round the frozen PCB)
+assert 142.8 < g["ridge_x"] - ob_[0] < 143.8, g["ridge_x"] - ob_[0]  # both outer edges ~143.3 mm from it (v2 142.4: v3's web is wider)
+# the B-N web ~15.4 mm at the top edge (v2 13.9: v3's walls lean in toward the ridge below it, 12.6 at the floor plane)
+assert 15.0 <= g["web_min"] <= 16.0 and 12.0 <= g["walls"]["web_floor"] <= 13.5, (g["web_min"], g["walls"]["web_floor"])
 assert abs(g["web_sym"][0] - dL) < 0.02 and abs(g["web_sym"][1] - dR) < 0.02 and min(g["web_sym"]) >= 2.3
 # 8: bezels: front 6.0 (the V-alignment correction is on the right, +0.10), sides 6.0, back 8.5; outline ~285.05 x 105.21
 assert P["bezel_front"] == 6.0 and P["bezel_back"] == 8.5 and P["bezel_side"] == 6.0
 assert abs(g["front_bezels"][0] - 6.0) < 1e-9 and abs(g["front_bezels"][1] - 6.10) < 0.01, g["front_bezels"]
-assert abs(g["outline_size"][0] - 285.05) < 0.5 and abs(g["outline_size"][1] - 105.21) < 0.6, g["outline_size"]
+assert abs(g["outline_size"][0] - 286.53) < 0.5 and abs(g["outline_size"][1] - 105.91) < 0.5, g["outline_size"]  # v3 (v2 284.75 x 105.69)
 # 4: the bottom panel is 6 mm wider each side (195.6 -> ~212.3 mm), the rear pentagon, three screws, solid front underside
 pb_ = s["panel"].bounds
 assert 212.0 <= pb_[2] - pb_[0] <= 212.6, pb_[2] - pb_[0]
 assert abs((pb_[0] + pb_[2]) / 2 - g["ridge_x"]) < 0.05 and len(sc) == 3
 assert s["panel"].distance(Point(g["ridge_x"], s["footprint"].bounds[1] + 1.0)) > 40  # nothing of the panel at the front
 # 3: bumpon recesses 8.4 x 0.5 for 3M SJ5302 at about the spec's spots (they follow the footprint)
-want_b = {"front left": (4.4, 20.8), "rear left": (4.4, 80.7), "front right": (259.0, 19.9), "rear right": (259.0, 80.7)}
+want_b = {"front left": (3.9, 19.5), "rear left": (3.9, 79.5), "front right": (259.5, 18.7), "rear right": (259.5, 79.5)}  # v3
 for b in bp:
     assert math.dist((b["x"], b["y"]), want_b[b["name"]]) < 0.7, (b["name"], b["x"], b["y"])
 assert not any(k_ in P for k_ in ("feet", "foot_depth", "foot_peg", "foot_fit", "snap", "pillar"))  # TPU feet / pegs / snaps are gone

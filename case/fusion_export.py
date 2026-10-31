@@ -15,7 +15,8 @@ import os
 import adsk.core
 import adsk.fusion
 
-CASE = os.path.expanduser("~/Documents/Development/personal/alice-case/case")
+CASE = next((d for d in (os.path.expanduser("~/Projects/alice-case/case"),  # (v3: Windows)
+                         os.path.expanduser("~/Documents/Development/personal/alice-case/case")) if os.path.isdir(d)))
 OUT = os.path.join(CASE, "out")
 COUP = os.path.join(OUT, "coupons")
 PROTO = os.path.join(OUT, "prototype")
@@ -30,7 +31,7 @@ RIDGE = g["ridge_x"]
 DOWEL = (3.0, 0.1, 6.0)  # dowel Ø, clearance per side (hole Ø3.2), hole depth each side (10 mm dowels)
 BED = P["bed"]
 PANEL_SPLIT = 30.0  # panel cut, mm right of the ridge: the panel bridges the body seam
-SRC = "Alice Case v2"
+SRC = "Alice Case v3"  # (v2 prints came from "Alice Case v2")
 
 
 def log(*a):
@@ -146,15 +147,17 @@ def W(m, u, v, w):
 
 # ---------------------------------------------------------------- step 1: copy the parts out of Alice Case
 PARTS = {  # export component <- (source component, body names or None for all)
-    "Body": ("Case", ["Body"]), "Panel": ("Case", ["Panel"]),
+    "Body": ("Case", ["Body"]), "Panel": ("Case", ["Panel"]), "PanelFlat": ("Case", ["PanelFlat"]),  # (v3: the flat-bottomed panel)
     "PlateL": ("PlateL", None), "PlateR": ("PlateR", None), "PcbL": ("PcbL", None), "PcbR": ("PcbR", None),
-    "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]), "TpuClipFront": ("TpuClipFront", None),
-    "TpuClipBack": ("TpuClipBack", None),  # v2: no feet or PCB snaps; two TPU clip variants (front 4, back 6)
+    "UDB": ("UDB", ["UDBBoard", "USBReceptacle"]),
+    # v3: one TPU clip for all 10 spots (v2: "TpuClipFront" x4 / "TpuClipBack" x6, for v2_prints)
+    **{"TpuClip" + vn.capitalize(): ("TpuClip" + vn.capitalize(), None) for vn in g["clip_variants"]},
 }
 
 
-def copy():
-    src = next(d for d in app.documents if d.name == SRC)
+def copy(src=None):
+    """src: the source document (default: the open one named SRC; v3: an unsaved build is still "Untitled", so pass it)."""
+    src = src or next(d for d in app.documents if d.name == SRC)
     sd = adsk.fusion.Design.cast(src.products.itemByProductType("DesignProductType"))
     occs = {o.component.name: o for o in sd.rootComponent.allOccurrences}
     app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
@@ -469,8 +472,9 @@ def socket_polys(k):
     return lobes, cut
 
 
-def dummy_pcbs():
-    os.makedirs(PROTO, exist_ok=True)
+def dummy_pcbs(out=None):
+    out = out or PROTO
+    os.makedirs(out, exist_ok=True)
     Lz = g["layers"]
     for h in ("left", "right"):
         d = g["halves"][h]
@@ -481,7 +485,7 @@ def dummy_pcbs():
         zr = lambda w: [-5.0 - w[1], -5.0 - w[0]]
         c = put("DummyPcb" + s, [], hidden=True)
         marks = []
-        for q in d["snaps"]:  # Ø1.2 through holes 1 mm past each end of every snap, on its inner edge (2.3 mm in)
+        for q in d.get("snaps", []):  # (v1 only) Ø1.2 through holes 1 mm past each end of every snap, on its inner edge (2.3 mm in)
             p2, p3 = q["poly"][2], q["poly"][3]
             u = [p2[0] - p3[0], p2[1] - p3[1]]
             lu = math.hypot(*u)
@@ -510,7 +514,7 @@ def dummy_pcbs():
         op(board, bs[1], "Union")
         b = put("DummyPcbPrint" + s, [to_origin(board)], hidden=True).bRepBodies.item(0)
         info(f"dummy_pcb_{h}", b)
-        mesh(b, os.path.join(PROTO, f"dummy_pcb_{h}.stl"))
+        mesh(b, os.path.join(out, f"dummy_pcb_{h}.stl"))
 
 
 def proto():
@@ -589,3 +593,40 @@ def v2_prints(out=None):
         b = put(n + "Plate", cl[:1], hidden=True).bRepBodies.item(0)
         info(f, b)
         mesh(b, os.path.join(out, f + ".stl"))
+
+
+def face_down(b):
+    """v3 clip: turned so its flat outer (wall-side) face, +x as modelled, lies on the bed: -90 deg about Y (x -> -z).
+    The slot and lip then stand straight up, the lattice cells are vertical holes and the 45 deg end chamfers need no support."""
+    m = adsk.core.Matrix3D.create()
+    m.setWithArray([0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1])
+    tbm.transform(b, m)
+    return b
+
+
+def v3_prints(out=None):
+    """v3: whole body, both panels (the v2-style one with the underside field, and the flat-bottomed one), the one TPU clip
+    (single, and a 10-up plate) laid on its outer face, and the dummy PCBs and plates (v3: they share one edge, the union
+    of the v1 outlines) -> prints/v3/ (run after copy())."""
+    out = out or os.path.join(PRINTS, "v3")
+    os.makedirs(out, exist_ok=True)
+    for n, f in (("Body", "case_body"), ("Panel", "bottom_panel"), ("PanelFlat", "bottom_panel_flat"), ("TpuClipAll", "tpu_clip")):
+        t = cp(body(n))
+        b = put(n + "Print", [to_origin(face_down(t) if n == "TpuClipAll" else t)], hidden=True).bRepBodies.item(0)
+        info(f, b)
+        mesh(b, os.path.join(out, f + ".stl"))
+    cl, y = [], 0.0
+    for i in range(10):  # one multi-lump body: a component with several bodies did not export
+        t = to_origin(face_down(cp(body("TpuClipAll"))), 0, y)
+        y = bbox(t)[4] + 4
+        cl.append(t)
+    for b in cl[1:]:
+        op(cl[0], b, "Union")
+    b = put("TpuClipAllPlate", cl[:1], hidden=True).bRepBodies.item(0)
+    info("tpu_clip_x10", b)
+    mesh(b, os.path.join(out, "tpu_clip_x10.stl"))
+    for h in ("left", "right"):
+        b = print_plate(h)
+        info("dummy_plate_" + h, b)
+        mesh(b, os.path.join(out, f"dummy_plate_{h}.stl"))
+    dummy_pcbs(out)

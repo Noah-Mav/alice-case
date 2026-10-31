@@ -20,8 +20,9 @@ The case is built in two stages. **Python does the maths** (`geometry.py` writes
 
 ## Change a parameter and rebuild
 
-1. **One-time venv** (only Homebrew python3.15 has a working Tk here):
+1. **One-time venv.** Mac (only Homebrew python3.15 has a working Tk there):
    `/opt/homebrew/bin/python3.15 -m venv case/.venv && case/.venv/bin/pip install shapely numpy   # venv has shapely 2.2.0, numpy 2.5.4`
+   Windows (v3 was built there; Python 3.12 from winget): `py -3.12 -m venv case/.venv && case/.venv/Scripts/pip install shapely numpy`, and use `case/.venv/Scripts/python` in the commands below.
 2. **Edit the number** in the `P` dict at the top of `geometry.py` (for example `"typing_angle": 8.0`).
 3. **Run the tests** from the repo root:
    `case/.venv/bin/python case/test_geometry.py layouts/layout2.json`
@@ -30,20 +31,21 @@ The case is built in two stages. **Python does the maths** (`geometry.py` writes
    `case/.venv/bin/python case/geometry.py layouts/layout2.json`
    (`ALICE_WEB_MODE=straight` in front of the command builds the straight-centre web instead of the stepped one.)
 5. **Build in Fusion through the Fusion MCP, in two steps** (the MCP call times out after about 60 s but the build keeps going; watch `out/fusion_build.log` for `built (checks skipped)`):
-   - **Step 1, build only.** Run the text of `fusion_build.py` with the script global `NO_CHECKS = True`. Every run creates a NEW document named **"Alice Case v2"** (v1, "Alice Case", is never touched; `INTO_ACTIVE` is gone). A full build takes about 5 minutes.
+   - **Step 1, build only.** Run the text of `fusion_build.py` with the script global `NO_CHECKS = True`. Every run creates a NEW document named **"Alice Case v3"** (`DOC_NAME`; v1 "Alice Case" and v2 "Alice Case v2" are never touched; `INTO_ACTIVE` is gone). A full build takes about 3 to 5 minutes. On Windows the script finds `case/out` under `~/Projects/alice-case`.
    - **Step 2, checks.** Run the text of `fusion_checks.py` (it loads `fusion_build.py` and calls `check_m3`, `check_m4`, `check_m5` and the UDB STEP check on the open document). Set the global `WHICH = ["m3"]` (or `"m4"`, `"m5"`, `"step"`) to run one at a time, which is safer against the 60 s timeout and rollback. It always skips the standoff probe (`SKIP_STANDOFF`); run `fusion_check_standoffs.py` on its own for the UDB standoff probe (slow; it has hung in full runs).
 6. **Read the log** (`out/fusion_build.log`): every `CHECK ...` line should end in `PASS`.
-7. **Save** in Fusion as a **new version** of "Alice Case v2" in the **Default Project** (File > Save, add a version note). Copy `geometry.py`, `test_geometry.py`, `fusion_build.py` and `out/case_geometry.json` into a new `checkpoints/<name>/` folder if the state is worth keeping.
+7. **Save** in Fusion as a **new version** of "Alice Case v3" in the **Default Project** (the API cannot save a new, empty document: File > Save it under that name the first time) (File > Save, add a version note). Copy `geometry.py`, `test_geometry.py`, `fusion_build.py` and `out/case_geometry.json` into a new `checkpoints/<name>/` folder if the state is worth keeping.
 
 ## What the checks mean
 
 - **Plate bbox vs JSON:** the plates in Fusion are the size the maths said (within 0.01 mm).
 - **Interference (Left / Right / UDB, and case vs all placeholders):** no part collides with another. A few overlaps inside one assembly are by design (the TPU clips grip the PCB, switches sit in the keycap envelope).
-- **PCB-to-wall gap:** at each of the 10 C-clips the PCB edge is at least `pcb_wall_min` (0.80 mm) from the wall at the PCB underside, mid and top (the PCB is tilted, the wall vertical: 0.8 to 1.3).
+- **PCB-to-wall gap:** (v3: the PCB and plate share one edge, so the wall is the same 0.9 from both) at each of the 10 C-clips the PCB edge is at least `pcb_wall_min` (0.80 mm) and at most `snap_gap` + 0.05 from the wall at the PCB underside, mid and top. v3: the wall is square to the PCB, so all three read 0.903 (v2's vertical wall gave 0.8 to 1.3).
 - **USB opening:** the stepped slot (22 wide chamber, 17 wide neck 2 mm deep at the rear face, 7.2 high) lines up with the board's USB receptacle.
 - **Walls (thinnest wall >= 5 mm):** no wall is thinner than 5 mm anywhere, as wood needs.
 - **Bezel top over the plate top (lip):** the case top is exactly 2.0 mm above each half's plate top everywhere.
-- **Printed clip variants:** the halves hold the exact printed FRONT (x4) / BACK (x6) bodies at their spots (same volume as `TpuClipFront` / `TpuClipBack`); none touches the Body, and each meets its PCB only in the lip's 0.1 grip (<= 1.6 mm3; measured 0.89).
+- **Interference, flat panel:** (v3) the hidden `PanelFlat` variant against the Body, the placeholders and the UDB, as for `Panel`.
+- **Printed clip variants:** the halves hold the exact printed clip at every spot (v3: one variant, `TpuClipAll`, x10; v2 had FRONT x4 / BACK x6); none touches the Body, and each meets its PCB only in the lip's 0.1 grip (<= 1.6 mm3; measured 0.82).
 - **C-clip recess fit:** each of the 10 clip bodies sits in its recess (no interference with the Body, bottom on the recess floor) with >= 3.5 mm of Body under it (floor plane >= 4.0 above the desk).
 - **Rear peak cut:** the top over the cut triangle is the one plane through A and the BC line; A and BC are where the JSON says; >= 5 mm of body over the UDB bay; ~22 mm of rear face over the USB slot.
 - **Floor over the cable channels / M3 inserts:** enough material (3 mm / 5 mm) is left over the cable channels and above each screw insert.
@@ -51,7 +53,7 @@ The case is built in two stages. **Python does the maths** (`geometry.py` writes
 - **Crease depth rule:** the crease line sits where the design says (level on the front, 9 mm below the top at the front corners; the back vertices deeper so the end creases are level).
 - **Lower band:** the leaning faces below the crease are flat planes leaning about 12 degrees.
 - **Web top flush:** the centre web top lies exactly on the top surface (no steps).
-- **Undercuts (Body, Panel):** every face can be cut by a 3-axis machine from the top or the bottom with no hidden face. "info: graze/hairline" lines are tiny slivers (under 0.03 mm) and are not failures.
+- **Undercuts (Body, Panel):** every face can be cut by a 3-axis machine from the top or the bottom with no hidden face, or (v3) from one of the two tilted pocket setups, `tilt L` / `tilt R` (each half's PCB plane level): the square pocket walls undercut a vertical tool at the back and the web side. "info: graze/hairline" lines are tiny slivers (under 0.03 mm) and are not failures.
 - **UDB STEP model vs Body + Panel:** the real board model fits the bay and slot with no collision.
 
 ## Known Fusion quirks

@@ -9,7 +9,25 @@ Read this whole file before starting. Section 4's numbers were decided at the st
 
 > **Reading guide.** Sections 1 to 11 below are the **original plan** (written before M1). Parts the build has since moved away from are marked **SUPERSEDED** and point at the table in "Status and decisions". Where the two disagree, the table and `case/geometry.py` (the `P` dict) win. The files `case/geometry.py`, `case/test_geometry.py`, `case/fusion_build.py` and `case/README.md` are the working record; see the README for how to rebuild.
 
-## Status and decisions (as built, 2026-10-18; v2 below, 2026-10-23)
+## Status and decisions (as built, 2026-10-18; v2 below, 2026-10-23; v3, 2026-10-31)
+
+### v3 (2026-10-31, user): square pocket walls, one clip
+
+v3 is built into a NEW Fusion document, **"Alice Case v3"** (v2 is unchanged in git history and "Alice Case v2"). The goal: v2's look, with walls that sit at 90 deg to the PCB, so there is no gap at the back and one TPU clip fits all 10 spots. The keys stay exactly as laid out (the user's layout); the PCB and plate edges may change (user).
+
+| Topic | v2 | **v3** |
+|---|---|---|
+| PCB / plate edge | frozen v1 outlines (the plate up to 0.54 mm past the PCB along the back and the web side) | **one shared edge** (`edge_v3`): the union of the v1 PCB and plate outlines, so the PCB grows up to 0.54 mm at the back and the web side to meet the plate. Keys, switch / socket holes, stabs and the JST header stay exactly where v1 has them (the JST is still placed on the v1 PCB outline). New dummy PCB / plate prints in `prints/v3/` |
+| Pocket walls | vertical (3-axis from the top): the PCB-to-wall gap ran 0.3 to 1.9 mm over the tilted PCB | **square to each half's PCB, one straight wall floor to top**: each pocket is a prism along its half's normal, the shared edge grown `snap_gap` (0.90), so the PCB, the plate and every clip are 0.9 from it all round (no ledge). Gap measured in Fusion: **0.903 mm at the underside, middle and top of the PCB at all 10 clips**. (Tried and dropped: a stepped wall, which showed a ledge; trimming the plate to the PCB, which left the back caps 0.62 mm off the wall) |
+| Clips | FRONT x4 / BACK x6, outer face leaning with its wall | **one clip, `TpuClipAll`, x10**: outer face square, 0.71 out from the PCB edge (0.19 air at the clip centre; 0.1 at the ends of the two back spots, where the R100 back edge bows 0.1 mm over the clip's 10 mm). Slot, lip, ledge and recesses unchanged. **Made for printing** (user): printed on its flat outer face, so the slot and lip stand straight up and the cells are vertical holes; the outer plan corners are **45 deg chamfers** (`c_out` 1.0, was R2.5, which started flat off the bed); no ID dimples. **Lattice**: 3 **flat-top** hex cells (2.4 wide, 2.08 tall, `lattice_n`), 0.8 waists, 0.6 end walls, ~1 mm skins: the walls between cells are hourglass struts that bend under the PCB (v2's pointy-top cells left straight 0.8 columns that carried it almost rigidly). Untested in TPU |
+| Top edge / bezels | opening from the cap envelopes + 1.5 | the top edge is the pocket prism at w = lip; **bezels unchanged** (6.0 / 6.1 front, 8.5 back, 6.0 sides): the outline follows the opening, so the case sits ~1.3 mm further forward on the keys and stays the same shape |
+| Keycap clearance | `artisan_gap` 1.5 to the opening | **`cap_gap_min` 1.1**: real bottomed-out Cherry caps keep 1.14 mm to the square wall (T G B / Y N, on the web side) |
+| Size | 284.75 x 105.69, max 39.34 | **286.53 x 105.91, max 39.06** (after the rear cut). Centre web 13.9 -> **15.4** at the top edge (12.6 at the floor): the web-side walls lean in below it. Moving the halves closer would break the 2 mm key-to-ridge rule |
+| Crease | `lower_back` 0.477 | **0.473** (end creases level again with the new heights) |
+| Machining | two ops, +-Z | the pockets need **two tilted setups (3+2), one per half with its PCB plane level**, or 5-axis: the back and web-side walls undercut a vertical tool by up to ~2.3 mm (16 mm of wall x tan 8 deg). The undercut check accepts `tilt L` / `tilt R`. Printing: no change |
+| Fusion | vertical prisms | `tilted_prism()` builds the pocket voids and the clip recess wall flat in the half's frame and moves them with its matrix; the prism stops 1 mm over the facet (taller, it leans out past the front) |
+| Bottom panel | one panel, recessed underside field running out through the back onto the rear-face field | **two variants** (user), both in the build: `Panel` as v2, and **`PanelFlat`** (hidden, same place): flat underside with no field or border, countersinks 0.4 lower so the screw heads sit flush; the rear-face field keeps its border and gets one along the bottom edge too (`band_recess_flat`). Exported as `bottom_panel.stl` and `bottom_panel_flat.stl` |
+
 
 ### v2 (2026-10-23, user approved): decisions that replace the rows of the table further down
 
