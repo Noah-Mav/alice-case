@@ -49,6 +49,7 @@ What changed in v3 (same look as v2):
 - Pocket walls square to each half's PCB (v2's were vertical): one straight wall, floor to top, 0.9 mm from the PCB, the plate and every clip all round. No gap at the back.
 - The PCB and plate share one edge (the outer edge of the two v1 outlines; the PCB grows up to 0.54 mm at the back and centre side). Key positions and spacing are unchanged.
 - Two bottom panels: the v2-style one with the recessed underside, and a flat-bottomed one (back border kept).
+- A second connector on the left PCB for the link to the right half (daughterboard -> left -> right); the left cable cutout is cut round both. See [pcb/v3/](pcb/v3/README.md).
 - One TPU clip for all 10 spots (`tpu_clip`), replacing the FRONT / BACK pair. It prints on its flat outer face with no supports (45 deg end chamfers), and its lattice has flat-top cells whose hourglass struts flex under the PCB.
 - Bezels, crease, rear cut, panel, USB step and bumpons as in v2. The case is 286.5 x 105.9 mm (1.8 mm wider: the centre web is 15.4 mm at the top, as the web-side walls lean in below it) and 39.1 mm tall.
 - Machining: the pockets need one tilted setup per half (3+2) or 5-axis; printing is unchanged.
@@ -67,3 +68,4 @@ git submodule update --init
 
 - [case/README.md](case/README.md): setup (venv), running the geometry and tests, Fusion build and export.
 - [docs/fusion-case-plan.md](docs/fusion-case-plan.md): the case design plan.
+- [pcb/v3/README.md](pcb/v3/README.md): what the real PCBs need (wiring of both halves, parts, design rules) and the KiCad outline / key files.

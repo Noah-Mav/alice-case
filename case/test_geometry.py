@@ -199,6 +199,13 @@ for h, d in g["halves"].items():
     minu, minv, maxu, maxv = d["pcb"].bounds
     jc = d["jst"].centroid
     assert (jc.x > (minu + maxu) / 2) == (h == "left") and jc.y > (minv + maxv) / 2, h
+    # v3: the left (main) PCB's second header (the link to the right half), in its own pocket beside the first
+    assert ("jst2" in d) == (h == "left"), h
+    if h == "left":
+        keep2 = unary_union([keep] + d["stabs"])
+        assert d["jst_pocket2"].within(d["pcb"]) and not d["jst_pocket2"].intersects(keep2)
+        assert d["jst2"].within(d["jst_pocket2"]) and d["jst_pocket2"].distance(d["jst_pocket"]) >= 0.5 - 1e-6
+        assert d["jst_pocket2"].centroid.distance(d["jst_pocket"].centroid) < 10, h  # beside it: one breakthrough
 
     # v2 (user): 5 TPU C-clips per half on the PCB edge, no snaps / pillars. The ledge under the PCB (len 10 x 2.5) clears the
     # real hotswap sockets, stabs and the JST pocket by clip_clear; the clip stands in the PCB-to-wall gap and fits its
@@ -506,7 +513,9 @@ for q in cs["islands"]:
 # cable path: each JST plug pocket inside its breakthrough; channel + breakthroughs + bay one connected void;
 # >= 3 mm of floor over the channel away from the breakthroughs
 for h, d in g["halves"].items():
-    assert cs["stubs"].buffer(0.01).contains(world(Ms[h], WB, d["jst_pocket"])), h
+    for k_ in ("jst_pocket", "jst_pocket2"):
+        if k_ in d:
+            assert cs["stubs"].buffer(0.01).contains(world(Ms[h], WB, d[k_])), (h, k_)
 assert unary_union([cs["chan"], cs["stubs"], g["bay"]]).buffer(0.01).geom_type == "Polygon"
 assert radius_ok(cs["chan"], P["pocket_r"], tol=0.1)
 ctop = cs["chan_z"][1]

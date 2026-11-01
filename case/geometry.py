@@ -77,6 +77,10 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     "keycap_h": 7.5,                # M6: Cherry profile cap, skirt to top (~R2-R4), for the bottomed-out envelope only
     "switch_top_h": 6.6,            # MX top housing above the plate top (housing top 11.6 above the PCB top)
     "jst": [6.0, 4.2, 2.95], "jst_pocket": [8.0, 6.0],  # §6.10 JST-SH 4-pin header, free space around it
+    # v3 (user): the left (main) PCB has a second header, for the link to the right half (the daughterboard has one output):
+    # a vertical JST-SH 4-pin (BM04B-SRSS-TB, ~6.0 x 4.25, 4.25 tall) whose plug goes straight down into the breakthrough,
+    # beside the first, in its own 8 x 6 pocket; the breakthrough is grown round both
+    "jst2": [6.0, 4.25, 4.25],
     "snap_gap": 0.9,                # PCB edge to pocket wall at mid-PCB (the clip spine fills it)
     "screw_head": 6.72,             # ISO 10642 M3 head diameter
     "screw_clear": 3.4,             # M3 clearance hole in the panel (90° countersink to screw_head)
@@ -264,6 +268,25 @@ def place_jst(pcb, keep, sgn):
         raise SystemExit("no room for the JST header near the inner back corner")
     c = best[1]
     return box(c[0] - hd / 2, c[1] - hl / 2, c[0] + hd / 2, c[1] + hl / 2), best[2]
+
+
+def place_jst2(pcb, keep, pocket1):
+    """v3: the left PCB's second (vertical) header: the nearest spot to the first header's pocket where its own 8 x 6
+    pocket (same orientation) fits inside the PCB, clear of the sockets, centre posts and stabs, 0.5 mm off the first."""
+    (pl, pd), (hl, hd) = P["jst_pocket"], P["jst2"][:2]
+    x0, y0 = pocket1.bounds[:2]
+    inside, blocked, near = prep(pcb), prep(keep), prep(pocket1.buffer(0.5))
+    best = None
+    for dx in np.arange(-20, 20.1, 0.5):
+        for dy in np.arange(-20, 20.1, 0.5):
+            b = box(x0 + dx, y0 + dy, x0 + dx + pd, y0 + dy + pl)
+            d_ = b.centroid.distance(pocket1.centroid)
+            if (best is None or d_ < best[0]) and inside.contains(b) and not blocked.intersects(b) and not near.intersects(b):
+                best = (d_, b)
+    if best is None:
+        raise SystemExit("no room for the second JST header beside the first")
+    c = best[1].centroid
+    return box(c.x - hd / 2, c.y - hl / 2, c.x + hd / 2, c.y + hl / 2), best[1]
 
 
 def world(M, u, v, w):
@@ -885,7 +908,7 @@ def _build(lay):
     bot_w = top_w - P["pcb_t"]
     layers = {"plate": [-pt, 0.0], "pcb": [bot_w, top_w], "switch_bottom": [top_w, 0.0],
               "switch_top": [0.0, P["switch_top_h"]], "keycap": [P["skirt_bottom_out"], P["skirt_bottom_out"] + P["keycap_h"]],
-              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w]}
+              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w], "jst2": [bot_w - P["jst2"][2], bot_w]}
     st, c, hw, U = P["stab"], P["cutout"] / 2, P["switch_body"] / 2, alice.U
     halves = {}
     for h, sgn in (("left", 1), ("right", -1)):
@@ -902,12 +925,16 @@ def _build(lay):
         posts = [Point(k["x"], k["y"]).buffer(POST_R) for k in keys]
         # (v3: on the v1 PCB outline, so the header stays where the v1 board has it; the shared edge only grew round it)
         jst, pocket = place_jst(affinity.translate(Polygon(FROZEN[h]["pcb"]), frozen[h]["du"], 0), unary_union(sockets + posts), sgn)
+        jst2 = pocket2 = None
+        if h == "left":
+            jst2, pocket2 = place_jst2(pcb, unary_union(sockets + posts + stabs), pocket)
         corners3 = [M @ [x, y, w, 1] for x, y in plate.exterior.coords for w in (-pt, 0.0)]
         # v2: the 5 C-clips of this half, at the given PCB-local edge points (v1 PCB frame: moved with the keys)
         socks_real = [Polygon([(k["x"] + x * math.cos(math.radians(k["ang"])) - y * math.sin(math.radians(k["ang"])),
                                 k["y"] + x * math.sin(math.radians(k["ang"])) + y * math.cos(math.radians(k["ang"])))
                                for x, y in SOCKET_REAL]) for k in keys]
-        clips = place_clips(pcb, [(x + frozen[h]["du"], y) for x, y in P["clip_pts"][h]], socks_real, stabs, pocket)
+        clips = place_clips(pcb, [(x + frozen[h]["du"], y) for x, y in P["clip_pts"][h]], socks_real, stabs,
+                            unary_union([pocket, pocket2]) if pocket2 else pocket)
         halves[h] = {"matrix": M.tolist(), "keys": keys, "blockers": blockers, "pcb": pcb, "plate": plate,
                      "cutouts": [key_rect(k, -c, -c, c, c) for k in keys], "stabs": stabs,
                      "switches": [key_rect(k, -hw, -hw, hw, hw) for k in keys], "sockets": sockets,
@@ -929,6 +956,9 @@ def _build(lay):
                          "SwitchTop": round(unary_union([key_rect(k, -hw, -hw, hw, hw) for k in keys]).area * P["switch_top_h"], 2),
                          "KeyEnvelope": round(unary_union([key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
                                                            for k in keys]).area * P["keycap_h"], 2)}}
+        if jst2:
+            halves[h].update({"jst2": jst2, "jst_pocket2": pocket2})
+            halves[h]["expect_vol"].update({"JstLink": round(jst2.area * P["jst2"][2], 2), "JstLinkPocket": round(pocket2.area * P["jst2"][2], 2)})
 
     # M5/M6 solid body. The pocket floor (op 2, from the top) is one plane per half parallel to its PCB with shallow
     # relief grooves between the rows (below) and a recess under each PCB clip. Islands stand up from it: a boss over
@@ -1073,7 +1103,7 @@ def _build(lay):
     for h, d in halves.items():
         M = Ms[h]
         A = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * wb + M[0, 3], M[1, 2] * wb + M[1, 3]]
-        jp = affinity.affine_transform(d["jst_pocket"], A)
+        jp = affinity.affine_transform(unary_union([d["jst_pocket"]] + ([d["jst_pocket2"]] if "jst_pocket2" in d else [])), A)
         stubs.append(opn3(jp.buffer(r3).intersection(opens_core[h])))  # (v3: a vertical prism, so inside the leaning walls at every height)
         lines.append(LineString([(jp.centroid.x, jp.centroid.y), (bay_c.x, bay_c.y)]))
     for q in islands:  # what Fusion takes out of the void: the island, run 0.5 into the wall (M6: no longer grown 0.05 in the

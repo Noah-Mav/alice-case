@@ -171,7 +171,10 @@ def build_half(root, g, h):
         "pcb": part(c, "Pcb" + s, m, ("Pcb" + s, [d["pcb"]], L["pcb"], True),
                     ("SocketKeepout", d["sockets"], L["socket"], False, 0.5),
                     ("JST", [d["jst"]], L["jst"]),
-                    ("JSTPlugPocket", [d["jst_pocket"]], L["jst"], False, 0.25), ctx=asm),
+                    ("JSTPlugPocket", [d["jst_pocket"]], L["jst"], False, 0.25),
+                    # v3: the left PCB's second (vertical) header, for the link to the right half
+                    *((("JstLink", [d["jst2"]], L["jst2"]), ("JstLinkPocket", [d["jst_pocket2"]], L["jst2"], False, 0.25))
+                      if "jst2" in d else ()), ctx=asm),
         "switches": part(c, "Switches" + s, m, ("SwitchBottom", d["cutouts"], L["switch_bottom"]),
                          ("SwitchTop", d["switches"], L["switch_top"]), ctx=asm),
         "keycaps": part(c, "Keycaps" + s, m, ("KeyEnvelope", d["keycaps"], L["keycap"], False, 0.35), ctx=asm),

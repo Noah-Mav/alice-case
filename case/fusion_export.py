@@ -496,7 +496,7 @@ def dummy_pcbs(out=None):
                               for t in range(16)])
         holes = [p for k in d["keys"] for p in pcb_holes(k)]
         slab(c, "Board", flip([d["pcb"]] + marks + holes), zr(Lz["pcb"]), True)
-        slab(c, "JST", flip([d["jst"]]), zr(Lz["jst"]))
+        slab(c, "JST", flip([d["jst"]] + ([d["jst2"]] if "jst2" in d else [])), zr(Lz["jst"]))  # (v3: the left's second header too, at the first's height)
         sk = [socket_polys(k) for k in d["keys"]]
         slab(c, "Sockets", flip([q for l, _ in sk for q in l]), zr(Lz["socket"]))
         slab(c, "SocketCut", flip([q for _, cu in sk for q in cu]), [zr(Lz["socket"])[0] - 0.1, zr(Lz["socket"])[1] + 0.1])
