@@ -1135,7 +1135,7 @@ def _build(lay):
         # jst_plug_h below, hulled), grown jst_hole[0], R jst_hole[1] corners (was the 8 x 6 pocket grown 3)
         Ab = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * (wb - P["jst_plug_h"]) + M[0, 3], M[1, 2] * (wb - P["jst_plug_h"]) + M[1, 3]]
         sweep_ = unary_union([MultiPoint(list(affinity.affine_transform(q_, A).exterior.coords) + list(affinity.affine_transform(q_, Ab).exterior.coords)).convex_hull
-                              for q_ in plugs_])
+                              for q_ in plugs_]).convex_hull  # (v3.3, user: the left's two headers share one hole, no thin web between)
         hm_, hr_ = P["jst_hole"]
         hole_ = sweep_.buffer(hm_, join_style="mitre").buffer(-hr_, quad_segs=16).buffer(hr_, quad_segs=16)
         stubs.append(hole_.intersection(opens_core[h]))  # (v3: a vertical prism, so inside the leaning walls at every height)

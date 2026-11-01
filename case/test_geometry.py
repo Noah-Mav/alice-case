@@ -519,7 +519,8 @@ for h, d in g["halves"].items():
         if k_ in d:
             assert d[k_].within(d["jst_pocket" + k_[8:]].buffer(1e-6)) and d["jst" + k_[8:]].within(d[k_].buffer(1e-6)), (h, k_)
             assert cs["stubs"].buffer(0.01).contains(world(Ms[h], WB, d[k_])), (h, k_)
-assert cs["stubs"].area < 200, cs["stubs"].area  # v3.2: small (v3.1: 364 mm2; now 172)
+assert cs["stubs"].area < 210, cs["stubs"].area  # v3.2: small (v3.1: 364 mm2)
+assert len(getattr(cs["stubs"], "geoms", [cs["stubs"]])) == 2  # v3.3: one hole per half (the left's two headers share it)
 assert unary_union([cs["chan"], cs["stubs"], g["bay"]]).buffer(0.01).geom_type == "Polygon"
 assert radius_ok(cs["chan"], P["pocket_r"], tol=0.1)
 ctop = cs["chan_z"][1]

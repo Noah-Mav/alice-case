@@ -37,7 +37,7 @@ USB-C ── daughterboard ──(4-pin, 1:1)──► LEFT PCB (MCU) ──(4-p
 
 | | Space in the case | Needs |
 |---|---|---|
-| Under each header | 17 to 18 mm from the board's underside down to the panel, through its own cable hole, **about 6 x 10 mm** (R1.5 corners; it follows the plug as it leans with the tilted board), kept small for the sound | the plug is 7.0 x 2.8 mm and 6.3 mm tall, wires straight down. The model reserves an 8 x 4 mm space, 10 mm deep, under each header and Fusion checks it clears the case |
+| Under each header | 17 to 18 mm from the board's underside down to the panel, through a cable hole (R1.5 corners; it follows the plug as it leans with the tilted board): **about 6 x 10 mm on the right, 13 x 12 mm on the left** (one hole for both headers), kept small for the sound | the plug is 7.0 x 2.8 mm and 6.3 mm tall, wires straight down. The model reserves an 8 x 4 mm space, 10 mm deep, under each header and Fusion checks it clears the case |
 | Cable channel (each half to the bay) | 13 mm wide x 4 mm tall | two 4-wire 28 AWG bundles, each about 1.6 to 2 mm across |
 | Daughterboard bay | 19 x 15 mm, 11.7 mm tall, the board hung from its ceiling | the Pico-EZmate plug is low (1.65 mm mated), and spare cable coils here |
 
