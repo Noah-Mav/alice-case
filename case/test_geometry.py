@@ -195,7 +195,7 @@ for h, d in g["halves"].items():
     # §6.10 JST header with its 8 x 6 plug pocket: on the PCB, clear of sockets and centre posts, inner back area.
     keep = unary_union(d["sockets"] + [Point(k["x"], k["y"]).buffer(2.0) for k in d["keys"]])
     assert d["jst_pocket"].within(d["pcb"]) and not d["jst_pocket"].intersects(keep)
-    assert d["jst"].within(d["jst_pocket"]) and abs(d["jst"].area - 6.0 * 4.2) < 1e-6
+    assert d["jst"].within(d["jst_pocket"]) and abs(d["jst"].area - P["jst"][0] * P["jst"][1]) < 1e-6
     minu, minv, maxu, maxv = d["pcb"].bounds
     jc = d["jst"].centroid
     assert (jc.x > (minu + maxu) / 2) == (h == "left") and jc.y > (minv + maxv) / 2, h
@@ -289,14 +289,16 @@ for h, d in g["halves"].items():
         assert fit_ >= cl["min_fit"] - 1e-3 and cl["fit"] >= cl["min_fit"], (h, q["name"], fit_)
         assert q["edge_dev"] <= 0.15, (h, q["name"], q["edge_dev"])  # the slot (x = 0) lies on the PCB edge within 0.15 along the clip's 10 mm
         q["_air"], q["_fit"] = o_min, fit_
-        assert len(q["lattice"]) == 3 and all(len(hx) == 6 for hx in q["lattice"])
-        hx_w = [p_[1] for p_ in q["lattice"][0]]
-        # v3: flat-top cells (hourglass struts between them), 0.8 at each waist, lattice_end at the two ends
-        hx_a = [[p_[0] for p_ in hx] for hx in q["lattice"]]
-        assert all(abs(max(hx_w) - min(hx_w) - (max(a_) - min(a_)) * math.sqrt(3) / 2) < 1e-9 for a_ in hx_a[:1])  # flat top: across flats is vertical
-        assert all(abs(min(hx_a[i_ + 1]) - max(hx_a[i_]) - cl["lattice_wall"]) < 1e-9 for i_ in range(len(hx_a) - 1))  # 0.8 waists
-        assert abs(min(hx_a[0]) + cl["len"] / 2 - cl["lattice_end"]) < 1e-9 and abs(cl["len"] / 2 - max(hx_a[-1]) - cl["lattice_end"]) < 1e-9
-        assert min(hx_w) - w_bot >= 0.6 and slot_lo - max(hx_w) >= 0.6, (h, q["name"])  # the cells sit between a floor and the ledge top
+        # v3.2: 3 stretched flat-top cells with rounded corners: waists >= 0.8 (2 perimeters), end walls >= lattice_end,
+        # skins >= lattice_skin, holes >= 2 mm wide and tall (print cleanly in TPU)
+        assert len(q["lattice"]) == 3
+        cells_ = [Polygon(hx) for hx in q["lattice"]]
+        hx_w = [p_[1] for hx in q["lattice"] for p_ in hx]
+        assert all(cells_[i_].distance(cells_[i_ + 1]) >= cl["lattice_wall"] - 1e-6 for i_ in range(2))
+        assert min(c_.bounds[0] for c_ in cells_) + cl["len"] / 2 >= cl["lattice_end"] - 1e-6
+        assert cl["len"] / 2 - max(c_.bounds[2] for c_ in cells_) >= cl["lattice_end"] - 1e-6
+        assert all(c_.bounds[2] - c_.bounds[0] >= 2.0 and c_.bounds[3] - c_.bounds[1] >= 2.0 for c_ in cells_)
+        assert min(hx_w) - w_bot >= cl["lattice_skin"] - 1e-6 and slot_lo - max(hx_w) >= cl["lattice_skin"] - 1e-6
         assert q["floor_z_min"] >= P["clip_floor_min"] - 1e-6 and abs(q["floor_z_min"] - min(
             G.z_at(Ms[h], G.FLOOR_W, x_, y_) for x_, y_ in mo_.exterior.coords)) < 1e-9
         assert q["floor_z_min"] - D_c >= P["base_min_groove"] - 1e-6  # >= 3.5 of body left under the recess floor

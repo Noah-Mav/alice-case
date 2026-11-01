@@ -171,9 +171,9 @@ def build_half(root, g, h):
         "pcb": part(c, "Pcb" + s, m, ("Pcb" + s, [d["pcb"]], L["pcb"], True),
                     ("SocketKeepout", d["sockets"], L["socket"], False, 0.5),
                     ("JST", [d["jst"]], L["jst"]),
-                    ("JSTPlugPocket", [d["jst_pocket"]], L["jst"], False, 0.25),
-                    # v3: the left PCB's second (vertical) header, for the link to the right half
-                    *((("JstLink", [d["jst2"]], L["jst2"]), ("JstLinkPocket", [d["jst_pocket2"]], L["jst2"], False, 0.25))
+                    ("JSTPlugPocket", [d["jst_pocket"]], L["jst_plug"], False, 0.25),  # (v3: the vertical plug and its wires' bend)
+                    # v3: the left PCB's second header, for the link to the right half
+                    *((("JstLink", [d["jst2"]], L["jst"]), ("JstLinkPocket", [d["jst_pocket2"]], L["jst_plug"], False, 0.25))
                       if "jst2" in d else ()), ctx=asm),
         "switches": part(c, "Switches" + s, m, ("SwitchBottom", d["cutouts"], L["switch_bottom"]),
                          ("SwitchTop", d["switches"], L["switch_top"]), ctx=asm),
@@ -182,7 +182,7 @@ def build_half(root, g, h):
     for q in d["clips"]:  # v2: q["matrix"] = the clip frame (x out from the PCB edge, y up the plate normal, z along the edge) -> world
         occs[f"clip{q['name']}"] = build_clip(c, f"Clip{q['name']}{s}", q["matrix"], q["profile"], q["lattice"],
                                               g["params"]["clip"]["len"], q["plan"], ctx=asm,
-                                              marks=g["clip_variants"][q["variant"]]["marks"], mark=g["params"]["clip"])
+                                              marks=g["clip_variants"][q["variant"]]["marks"], mark=g["params"]["clip"], ends=q["ends"])
     return asm, occs
 
 
@@ -193,7 +193,7 @@ def build_udb(root, g):
                 ("USBReceptacle", [u["receptacle"]], u["receptacle_z"]))
 
 
-def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None, marks=0, mark=None):
+def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None, marks=0, mark=None, ends=None):
     """v2: one TPU C-clip as one body in its own component. profile = the side view in the component's XY (x out from the
     PCB edge toward the wall, y = height), extruded +- length / 2 along z (the edge); hexes = the lattice cells (z along
     the edge, y height) cut through along x. plan = the clip's plan (x out, z along the edge; the recess outline less the
@@ -215,6 +215,19 @@ def build_clip(parent, name, m, profile, hexes, length, plan, ctx=None, marks=0,
     inp.setSymmetricExtent(adsk.core.ValueInput.createByString("40 mm"), True)
     inp.participantBodies = [c.bRepBodies.item(0)]  # else it intersects EVERY body it touches in the design (shredded the plates and PCBs)
     c.features.extrudeFeatures.add(inp).name = "PlanTrim"
+    if ends:  # v3.2: the ends (z, height) with the edges across the clip rounded, through along x
+        se = c.sketches.add(c.yZConstructionPlane)
+        se.name = "Ends"
+        se.isComputeDeferred = True
+        pe = [se.modelToSketchSpace(P3(0, w, a)) for a, w in ends]
+        for i in range(len(pe)):
+            se.sketchCurves.sketchLines.addByTwoPoints(pe[i], pe[(i + 1) % len(pe)])
+        se.isComputeDeferred = False
+        prof_e = max((se.profiles.item(i) for i in range(se.profiles.count)), key=lambda q: q.areaProperties().area)
+        inp = c.features.extrudeFeatures.createInput(prof_e, adsk.fusion.FeatureOperations.IntersectFeatureOperation)
+        inp.setSymmetricExtent(adsk.core.ValueInput.createByString("40 mm"), True)
+        inp.participantBodies = [c.bRepBodies.item(0)]
+        c.features.extrudeFeatures.add(inp).name = "EndRound"
     sk = c.sketches.add(c.yZConstructionPlane)
     sk.name = "Lattice"
     sk.isComputeDeferred = True
@@ -279,9 +292,10 @@ def build_tpu_clip(root, g):
     for i, (vn, v) in enumerate(g["clip_variants"].items()):
         prof = [[x, w - wb] for x, w in v["profile"]]
         lat = [[[a, w - wb] for a, w in hx] for hx in v["lattice"]]
+        ends = [[a, w - wb] for a, w in v["ends"]]
         nm = "TpuClip" + vn.capitalize()
         occ = build_clip(root, nm, [[1, 0, 0, x0], [0, 1, 0, 0], [0, 0, 1, 20.0 * i], [0, 0, 0, 1]], prof, lat, P["clip"]["len"], v["plan"],
-                         marks=v["marks"], mark=P["clip"])
+                         marks=v["marks"], mark=P["clip"], ends=ends)
         b = occ.component.bRepBodies.item(0)
         log(f"{nm}: {occ.component.bRepBodies.count} body, solid {b.isSolid}, {b.volume * 1000:.2f} mm3, "
             f"{P['clip']['len']} long x {max(p[1] for p in prof) - min(p[1] for p in prof):.1f} high x "

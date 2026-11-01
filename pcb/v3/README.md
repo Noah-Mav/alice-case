@@ -15,6 +15,7 @@ USB-C ── daughterboard ──(4-pin, 1:1)──► LEFT PCB (MCU) ──(4-p
 - **Right PCB:** the same kind of board, with its own MCU, and one header to the left half.
 - **Firmware:** QMK split (or Vial). The left half talks to the computer; the two halves talk over a single-wire serial link on the 4-pin cable.
 - **Cables:** both run through the case's existing cable channels into the daughterboard bay, then on to the left half's headers.
+- **All three PCB headers are vertical** (JST-SH BM04B-SRSS-TB, on the bottom of the board): the plug and its wires go straight down into the case's cable cutout. A side-entry header doesn't work here: it faces the centre wall, and with the plug in it ends about 0.1 mm from the wall, leaving the wires no room to turn.
 
 **Why an MCU on each half:** the right half then needs only 4 wires (5 V, GND, data, plus a spare), so it can use the same small connector the case is already cut for. The other way, running the right half's whole key matrix over the cable, needs about 10 wires and a bigger connector on both halves.
 
@@ -23,12 +24,22 @@ USB-C ── daughterboard ──(4-pin, 1:1)──► LEFT PCB (MCU) ──(4-p
 | | Part | Pins (1 to 4) |
 |---|---|---|
 | Daughterboard output | JST-SH 4-pin on the C3 (SM04B-SRSS-TB). C4 / C5 use Molex Pico-EZmate (781710004); same board size, so the case fits either | **1 VBUS (5 V), 2 D−, 3 D+, 4 GND** (from the C3 KiCad source) |
-| Left header 1 (USB in) | Same family as your daughterboard, with **the same pinout, not mirrored** (the cable is 1:1) | 1 VBUS, 2 D−, 3 D+, 4 GND |
-| Left header 2 (link) | JST-SH 4-pin, **vertical** (BM04B-SRSS-TB): the plug goes straight down into the case's cable cutout, so it never meets header 1 | 1 VBUS (5 V), 2 serial data, 3 spare (or the second serial line), 4 GND |
-| Right header (link) | JST-SH 4-pin, SM04B-SRSS-TB (side entry, like header 1) | same as left header 2 |
+| Left header 1 (USB in) | JST-SH 4-pin, vertical (BM04B-SRSS-TB), **the same pinout as the daughterboard, not mirrored** (the cable is 1:1) | 1 VBUS, 2 D−, 3 D+, 4 GND |
+| Left header 2 (link) | JST-SH 4-pin, vertical (BM04B-SRSS-TB) | 1 VBUS (5 V), 2 serial data, 3 spare (or the second serial line), 4 GND |
+| Right header (link) | JST-SH 4-pin, vertical (BM04B-SRSS-TB) | same as left header 2 |
 
 - **Power on the same pins everywhere.** VBUS is on pin 1 and GND on pin 4 on every header. If a cable goes into the wrong header, nothing gets damaged.
-- **Cables:** use 4-pin cables wired 1:1 (pin 1 to pin 1). Buy them ready-made, or make them to length from a 4-pin housing (JST-SH: SHR-04V-S-B) and pre-crimped wires. The daughterboard docs list the parts for the Pico-EZmate version. About 100 mm each leaves slack to tuck into the bay: each header is about 20 to 25 mm from the bay in plan, plus the drops.
+- **Daughterboard cable:** with a C4 / C5 daughterboard (Pico-EZmate), use a **Pico-EZmate to JST-SH** 4-pin 1:1 cable. The C4 kit includes one, 170 mm long (Elecrow). With a C3, use JST-SH at both ends.
+- **Link cable:** JST-SH to JST-SH, 4-pin, 1:1. Buy it ready-made (typically 28 AWG twisted pairs, e.g. Pololu's double-ended JST-SH cables in 100 and 160 mm), or make one from SHR-04V-S-B housings and pre-crimped 28 to 32 AWG wire.
+- **Lengths:** 100 to 160 mm. Each header drops about 17 mm to the channel floor and sits 20 to 25 mm from the bay in plan. Coil any extra in the bay, and avoid sharp kinks right at the plug.
+
+### Room for the cables in the case
+
+| | Space in the case | Needs |
+|---|---|---|
+| Under each header | 17 to 18 mm from the board's underside down to the panel, through the cable cutout | the vertical plug is 6.3 mm tall with its wires straight out, about 10 mm with their bend. The model reserves that 10 mm and Fusion checks it clears the case |
+| Cable channel (each half to the bay) | 13 mm wide x 4 mm tall | two 4-wire 28 AWG bundles, each about 1.6 to 2 mm across |
+| Daughterboard bay | 19 x 15 mm, 11.7 mm tall, the board hung from its ceiling | the Pico-EZmate plug is low (1.65 mm mated), and spare cable coils here |
 
 ## Design rules from the case
 
@@ -43,7 +54,7 @@ USB-C ── daughterboard ──(4-pin, 1:1)──► LEFT PCB (MCU) ──(4-p
 | Bottom parts | **2.5 mm tall at most** (3.5 mm of air under the board, 1 mm margin). The sockets sit over the floor grooves. Keep parts off the socket outlines and the switch centre posts |
 | Top parts | none between the switches (the plate and switch housings fill that space) |
 | Header 1 | the `CONNECTOR` outline, at the inner back corner of each half. The case's breakthrough to the bay is under it, so keep the header there, facing the bay |
-| Header 2 (left only) | the `CONNECTOR_2` outline, just outboard of header 1 (pocket x 102.8 to 108.8, y 60.1 to 68.1), clear of the sockets. A vertical header, so its plug enters from below; the case's cable cutout is cut round both headers |
+| Header 2 (left only) | the `CONNECTOR_2` outline, just outboard of header 1 (pocket x 102.8 to 108.8, y 60.1 to 68.1), clear of the sockets. The case's cable cutout is cut round both headers |
 | MCU space | the largest clear square on the bottom of each half is about **10 x 10 mm** (90+ spots between the sockets) |
 
 ## Parts per half

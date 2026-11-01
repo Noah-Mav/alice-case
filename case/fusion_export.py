@@ -496,14 +496,17 @@ def dummy_pcbs(out=None):
                               for t in range(16)])
         holes = [p for k in d["keys"] for p in pcb_holes(k)]
         slab(c, "Board", flip([d["pcb"]] + marks + holes), zr(Lz["pcb"]), True)
-        slab(c, "JST", flip([d["jst"]] + ([d["jst2"]] if "jst2" in d else [])), zr(Lz["jst"]))  # (v3: the left's second header too, at the first's height)
+        slab(c, "JST", flip([d["jst"]]), zr(Lz["jst"]))
+        if "jst2" in d:  # v3: the left's second header, for the link to the right half
+            slab(c, "JstLink", flip([d["jst2"]]), zr(Lz["jst"]))
+        n_hdr = c.bRepBodies.count - 1  # (v3: count, not assume, the header bodies: a second one shifted the sockets by one)
         sk = [socket_polys(k) for k in d["keys"]]
         slab(c, "Sockets", flip([q for l, _ in sk for q in l]), zr(Lz["socket"]))
         slab(c, "SocketCut", flip([q for _, cu in sk for q in cu]), [zr(Lz["socket"])[0] - 0.1, zr(Lz["socket"])[1] + 0.1])
         bs = [cp(b) for b in c.bRepBodies]
         board = bs[0]
         ns = len(sk)
-        socks, cuts = bs[2:2 + ns], bs[2 + ns:]
+        socks, cuts = bs[1 + n_hdr:1 + n_hdr + ns], bs[1 + n_hdr + ns:]
         for sb in socks:  # cut each socket by the slots/holes inside its own footprint, then join (cheap small booleans)
             b0 = bbox(sb)
             for t in cuts:
@@ -511,7 +514,8 @@ def dummy_pcbs(out=None):
                 if b1[0] < b0[3] and b1[3] > b0[0] and b1[1] < b0[4] and b1[4] > b0[1]:
                     op(sb, cp(t), "Difference")
             op(board, sb, "Union")
-        op(board, bs[1], "Union")
+        for hb in bs[1:1 + n_hdr]:
+            op(board, hb, "Union")
         b = put("DummyPcbPrint" + s, [to_origin(board)], hidden=True).bRepBodies.item(0)
         info(f"dummy_pcb_{h}", b)
         mesh(b, os.path.join(out, f"dummy_pcb_{h}.stl"))

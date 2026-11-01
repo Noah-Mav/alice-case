@@ -76,11 +76,13 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     "usb_recess": 2.25,             # receptacle face behind the outer rear face: the neck depth + 0.25 (v2; was 1.0, limit <= 1.5)
     "keycap_h": 7.5,                # M6: Cherry profile cap, skirt to top (~R2-R4), for the bottomed-out envelope only
     "switch_top_h": 6.6,            # MX top housing above the plate top (housing top 11.6 above the PCB top)
-    "jst": [6.0, 4.2, 2.95], "jst_pocket": [8.0, 6.0],  # §6.10 JST-SH 4-pin header, free space around it
-    # v3 (user): the left (main) PCB has a second header, for the link to the right half (the daughterboard has one output):
-    # a vertical JST-SH 4-pin (BM04B-SRSS-TB, ~6.0 x 4.25, 4.25 tall) whose plug goes straight down into the breakthrough,
-    # beside the first, in its own 8 x 6 pocket; the breakthrough is grown round both
-    "jst2": [6.0, 4.25, 4.25],
+    # §6.10 JST-SH 4-pin header [long, short, tall] and the free space round it [long, short]. v3: every header is the VERTICAL
+    # BM04B-SRSS-TB (6.0 x 2.9, 4.25 tall; JST eSH datasheet): the plug and its wires go straight down into the breakthrough.
+    # The side-entry SM04B faced the web wall, and mated (6.25 long) its plug ended ~0.1 mm from the square wall with no room
+    # for the wires to turn. jst_plug_h: the plug space under the PCB (mated 6.3 + the wires' bend); Fusion checks it clear
+    "jst": [6.0, 2.9, 4.25], "jst_pocket": [8.0, 6.0], "jst_plug_h": 10.0,
+    # v3 (user): the left (main) PCB has a second header, for the link to the right half (the daughterboard has one output),
+    # the same part beside the first, in its own 8 x 6 pocket; the breakthrough is grown round both
     "snap_gap": 0.9,                # PCB edge to pocket wall at mid-PCB (the clip spine fills it)
     "screw_head": 6.72,             # ISO 10642 M3 head diameter
     "screw_clear": 3.4,             # M3 clearance hole in the panel (90° countersink to screw_head)
@@ -136,12 +138,15 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # and a 45 deg lead-in chamfer (the depth wide) on its three open sides. The floor plane under a recess must be
     # >= clip_floor_min above the desk (local exception to base_min: 4.0 - 0.5 = 3.5 left under it).
     # clip_pts: the PCB-local edge points (v1 PCB frame, as the spots were chosen); geometry.py snaps them to the frozen edge
-    "clip": {"len": 10.0, "slot": 1.5, "under": 2.5, "lip": 1.0, "lip_overlap": 1.5, "lip_lead": 30.0, "lead": 0.4,
-             # v3 (user: easy to print, a better lattice): n flat-top hexagons in a row along the edge, sized to fill the length
-             # between end walls lattice_end thick with lattice_wall at each waist between cells. Flat tops / pointy sides:
-             # the walls between cells are hourglass struts that bend as the PCB pushes down (v2's pointy-top cells left
-             # straight 0.8 columns that carried it almost rigidly). Printed on its outer face the cells are vertical holes
-             "wall_air": 0.1, "lattice_n": 3, "lattice_wall": 0.8, "lattice_end": 0.6,
+    "clip": {"len": 10.0, "slot": 1.5, "under": 2.5, "lip": 1.0, "lip_overlap": 1.5, "lip_lead": 45.0, "lead": 0.4,
+             # v3.2 (user: squarer, easy to print in TPU, a lattice that squishes): n cells in one row along the edge, each a
+             # flat-top hexagon stretched to the ledge's height less lattice_skin top and bottom (2.6 tall), sides at 60 deg,
+             # sized to fill the length between end walls lattice_end thick with lattice_wall at each waist; hole corners
+             # rounded lattice_r. The struts between cells lean (hourglass) and the skins span the flat tops, so they bend
+             # (soft, bending-dominated) and stiffen as the cells close: progressive. 0.8 walls = 2 perimeters of a 0.4 nozzle.
+             # Printed on its outer face the cells are vertical holes
+             "wall_air": 0.1, "lattice_n": 3, "lattice_wall": 0.8, "lattice_end": 0.6, "lattice_skin": 0.7, "lattice_r": 0.4,
+             "r_end": 0.5,  # v3.2: the four edges across the clip at its ends (vertical as printed) rounded
              # fit in the recess: the clip's plan is the recess's own outline (rr_x: 10.4 long, R clip_r corners, running past the
              # wall) shrunk by `fit` all round: 0.2 to the ends and the R1.5 corners at the recess bottom (its narrowest: the
              # lead-in only widens it), trimmed by the profile's ledge (2.5 under the PCB, 0.4 in from the recess side) and the
@@ -154,9 +159,9 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
              # variant serves (a lean of ~8 deg, the wall's own). Plan: rectangle len x (under .. xmax) with R r_in (recess side) / (v3) 45 deg c_out chamfers (v2: R r_out)
              # (wall side) corners. Marks: blind dimples on the lip top (1 for F, 2 for B), mark_d wide, mark_depth deep, at x mark_x,
              # +-mark_dz along the edge: they touch nothing and change no fit
-             # v3: the outer (wall-side) plan corners are 45 deg chamfers c_out (v2: R2.5), so printed on that flat face they
-             # rise at 45 deg off the bed instead of starting flat; they clear the recess's R1.5 corners by min_fit
-             "r_in": 1.2, "c_out": 1.0, "mark_d": 0.8, "mark_depth": 0.4, "mark_x": -0.4, "mark_dz": 1.0},
+             # v3.2 (user: squarer): the outer (wall-side) plan corners are square (c_out 0; v3 had 45 deg chamfers, v2 R2.5):
+             # they lie on the bed as printed; the inner ones keep R r_in, inside the recess's R1.5 corners by min_fit
+             "r_in": 1.2, "c_out": 0.0, "mark_d": 0.8, "mark_depth": 0.4, "mark_x": -0.4, "mark_dz": 1.0},
     # which spots (1-based, per half) take which variant: front edge (Alt, Shift/Z) = FRONT; back edge (R/T, Tab) and inner (right of B) = BACK
     # v3 (user): the walls are square to the PCB, the gap is snap_gap everywhere: one clip for all 10 spots
     "clip_variants": {"all": {"left": [1, 2, 3, 4, 5], "right": [1, 2, 3, 4, 5], "marks": 0}},  # (one clip: no ID dimples)
@@ -273,7 +278,7 @@ def place_jst(pcb, keep, sgn):
 def place_jst2(pcb, keep, pocket1):
     """v3: the left PCB's second (vertical) header: the nearest spot to the first header's pocket where its own 8 x 6
     pocket (same orientation) fits inside the PCB, clear of the sockets, centre posts and stabs, 0.5 mm off the first."""
-    (pl, pd), (hl, hd) = P["jst_pocket"], P["jst2"][:2]
+    (pl, pd), (hl, hd) = P["jst_pocket"], P["jst"][:2]
     x0, y0 = pocket1.bounds[:2]
     inside, blocked, near = prep(pcb), prep(keep), prep(pocket1.buffer(0.5))
     best = None
@@ -359,7 +364,8 @@ def clip_shape(xb, xt, w_bot, wb_, w_slot, w_top):
     xp = max(xb, xt)
     ri, co = cl["r_in"], cl["c_out"]
     A = box(-u, -L / 2, xp + 10, L / 2).buffer(-ri, quad_segs=8).buffer(ri, quad_segs=8)
-    B = Polygon([(-u - 10, -L / 2), (xp - co, -L / 2), (xp, -L / 2 + co), (xp, L / 2 - co), (xp - co, L / 2), (-u - 10, L / 2)])
+    B = Polygon([(-u - 10, -L / 2), (xp - co, -L / 2), (xp, -L / 2 + co), (xp, L / 2 - co), (xp - co, L / 2), (-u - 10, L / 2)]) \
+        if co > 0 else box(-u - 10, -L / 2, xp, L / 2)
     return prof, A.intersection(B)
 
 
@@ -908,7 +914,7 @@ def _build(lay):
     bot_w = top_w - P["pcb_t"]
     layers = {"plate": [-pt, 0.0], "pcb": [bot_w, top_w], "switch_bottom": [top_w, 0.0],
               "switch_top": [0.0, P["switch_top_h"]], "keycap": [P["skirt_bottom_out"], P["skirt_bottom_out"] + P["keycap_h"]],
-              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w], "jst2": [bot_w - P["jst2"][2], bot_w]}
+              "socket": [bot_w - P["socket_h"], bot_w], "jst": [bot_w - P["jst"][2], bot_w], "jst_plug": [bot_w - P["jst_plug_h"], bot_w]}
     st, c, hw, U = P["stab"], P["cutout"] / 2, P["switch_body"] / 2, alice.U
     halves = {}
     for h, sgn in (("left", 1), ("right", -1)):
@@ -951,14 +957,14 @@ def _build(lay):
                          "Plate": round((plate.area - unary_union([key_rect(k, -c, -c, c, c) for k in keys] + list(stabs)).area) * pt, 2),
                          "Pcb": round(pcb.area * P["pcb_t"], 2),
                          "SocketKeepout": round(unary_union(sockets).area * P["socket_h"], 2),
-                         "JST": round(jst.area * P["jst"][2], 2), "JSTPlugPocket": round(pocket.area * P["jst"][2], 2),
+                         "JST": round(jst.area * P["jst"][2], 2), "JSTPlugPocket": round(pocket.area * P["jst_plug_h"], 2),
                          "SwitchBottom": round(unary_union([key_rect(k, -c, -c, c, c) for k in keys]).area * -layers["switch_bottom"][0], 2),
                          "SwitchTop": round(unary_union([key_rect(k, -hw, -hw, hw, hw) for k in keys]).area * P["switch_top_h"], 2),
                          "KeyEnvelope": round(unary_union([key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
                                                            for k in keys]).area * P["keycap_h"], 2)}}
         if jst2:
             halves[h].update({"jst2": jst2, "jst_pocket2": pocket2})
-            halves[h]["expect_vol"].update({"JstLink": round(jst2.area * P["jst2"][2], 2), "JstLinkPocket": round(pocket2.area * P["jst2"][2], 2)})
+            halves[h]["expect_vol"].update({"JstLink": round(jst2.area * P["jst"][2], 2), "JstLinkPocket": round(pocket2.area * P["jst_plug_h"], 2)})
 
     # M5/M6 solid body. The pocket floor (op 2, from the top) is one plane per half parallel to its PCB with shallow
     # relief grooves between the rows (below) and a recess under each PCB clip. Islands stand up from it: a boss over
@@ -1030,8 +1036,8 @@ def _build(lay):
             # out past the pocket wall (v3: snap_gap from the PCB edge in every plane; v2's vertical wall was 0.3 .. 1.9 off it), then
             # cut to the pocket: the wall side is the wall itself (no undercut, no rounded corners there), the R clip_r corners
             # are the inner ones
-            raw_x = Polygon([fr_(-rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, dw_ + 0.5),
-                             fr_(-rl_ / 2, dw_ + 0.5)])
+            raw_x = Polygon([fr_(-rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, -(rw_ - P["snap_gap"])), fr_(rl_ / 2, dw_ + P["clip_r"] + 0.5),
+                             fr_(-rl_ / 2, dw_ + P["clip_r"] + 0.5)])  # (v3.2: run clip_r past the wall, so its R corners lie in the wall and the square clip corners fit)
             rr_x = raw_x.buffer(-P["clip_r"], quad_segs=16).buffer(P["clip_r"], quad_segs=16)  # (corners past the wall: the wall side stays sharp)
             mo_x = rr_x.buffer(rd_, quad_segs=16)  # the lead-in's top outline, uncut: Fusion tapers it 45 deg down to rr_x, then trims to the wall
             rr_, mo_ = rr_x.intersection(o_levels[fw]), mo_x.intersection(o_levels[fw])
@@ -1042,19 +1048,29 @@ def _build(lay):
     variants = clip_variants(pre, w_bot, wb_, w_slot, w_top)
     ld_ = cl_["lead"] / math.tan(math.radians(cl_["lip_lead"]))
     nh_, cw_ = cl_["lattice_n"], cl_["lattice_wall"]
-    hy_ = (cl_["len"] - 2 * cl_["lattice_end"] - (nh_ - 1) * cw_) / (2 * nh_)  # flat-top hexagon's circumradius (1.2: 2.4 wide, 2.08 tall)
     wc_ = (w_bot + wb_) / 2  # the middle of the ledge's height
-    hexes = [[(a0 + hy_ * math.cos(math.radians(60 * k_)), wc_ + hy_ * math.sin(math.radians(60 * k_))) for k_ in range(6)]
-             for a0 in [(i_ - (nh_ - 1) / 2) * (2 * hy_ + cw_) for i_ in range(nh_)]]
+    hc_ = wb_ - w_bot - 2 * cl_["lattice_skin"]  # v3.2: the cell height (2.6)
+    mw_ = (cl_["len"] - 2 * cl_["lattice_end"] - (nh_ - 1) * cw_) / nh_  # the cell width at mid height (2.4)
+    ft_ = mw_ - hc_ / math.tan(math.radians(60))  # the flat top / bottom (0.9)
+    assert ft_ > 2 * cl_["lattice_r"], ft_
+    hexes = []
+    for a0 in [(i_ - (nh_ - 1) / 2) * (mw_ + cw_) for i_ in range(nh_)]:
+        hx_ = Polygon([(a0 - mw_ / 2, wc_), (a0 - ft_ / 2, wc_ - hc_ / 2), (a0 + ft_ / 2, wc_ - hc_ / 2), (a0 + mw_ / 2, wc_),
+                       (a0 + ft_ / 2, wc_ + hc_ / 2), (a0 - ft_ / 2, wc_ + hc_ / 2)])
+        hx_ = hx_.buffer(-cl_["lattice_r"], join_style="mitre").buffer(cl_["lattice_r"], quad_segs=4)  # rounded hole corners
+        hexes.append([(round(a_, 4), round(w_, 4)) for a_, w_ in hx_.exterior.coords[:-1]])
+    # v3.2: the clip's ends (z along the edge, w) with the four edges across it rounded r_end
+    ends_ = box(-cl_["len"] / 2, w_bot, cl_["len"] / 2, w_top).buffer(-cl_["r_end"], join_style="mitre").buffer(cl_["r_end"], quad_segs=4)
+    ends_ = [(round(a_, 4), round(w_, 4)) for a_, w_ in ends_.exterior.coords[:-1]]
     for vn_, v_ in variants.items():
-        v_["lattice"] = hexes
+        v_["lattice"], v_["ends"] = hexes, ends_
     for h, d in halves.items():
         Mh = Ms[h]
         for q in d["clips"]:
             c_, t_, n_ = pre[(h, q["name"])]["c"], pre[(h, q["name"])]["t"], pre[(h, q["name"])]["n"]
             v_ = next(v__ for v__ in variants.values() if (h, q["name"]) in v__["spot_keys"])
             Lc = np.array([[n_[0], 0, n_[1], c_[0]], [n_[1], 0, -n_[0], c_[1]], [0, 1, 0, 0], [0, 0, 0, 1]])
-            q.update({"variant": v_["name"], "plan": v_["plan"], "profile": v_["profile"], "lattice": hexes,
+            q.update({"variant": v_["name"], "plan": v_["plan"], "profile": v_["profile"], "lattice": hexes, "ends": ends_,
                       "matrix": (Mh @ Lc).tolist(), "wall_n": [[w_, float(pre[(h, q["name"])]["wall_at"](w_))] for w_ in (w_bot, wb_, w_top)]})
     for v_ in variants.values():
         v_.pop("spot_keys")
