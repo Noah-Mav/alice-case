@@ -67,14 +67,19 @@ Exported from the Fusion v3 build by `v3_prints()` in `case/fusion_export.py`, i
 
 | File | Material | Orientation / supports |
 |---|---|---|
-| `v3/case_body.stl` | PLA or PETG | One piece, bottom down (as modelled). 286.5 x 105.9 x 39.1 mm. Supports under the panel-recess area. |
-| `v3/bottom_panel.stl` | PLA or PETG | Variant 1, as v2 (recessed underside field): one piece, outer (desk) face down, no supports. 212.2 x 55.2 mm. |
-| `v3/bottom_panel_flat.stl` | PLA or PETG | Variant 2: flat underside with no border, screw heads flush; the back keeps its bordered field. Outer face down, no supports. Print one or the other. |
+| `v3/case_body.stl` | PLA or PETG | One piece, bottom down (as modelled). 286.5 x 105.9 x 39.1 mm: needs a bed of about 290 x 110 mm or more. **Supports on the build plate only**, under the panel recess ceiling, the cable channels, the daughterboard bay and the USB slot (all open to the bed). Nothing on the top side needs support (the square pocket walls lean at most about 8 deg). |
+| `v3/bottom_panel_flat.stl` | PLA or PETG | **The one to print.** Flat underside with no border, screw heads flush; the back keeps its bordered field. Outer face down, no supports (only small bridges). 212.2 x 55.2 x 7.6 mm. |
+| `v3/bottom_panel.stl` | (machining) | The recessed-underside variant, for CNC. Printed face down, its 0.6 mm field (about 8,700 mm2) starts in the air, so it needs supports there and the visible face comes out rough; print the flat one instead. |
 | `v3/tpu_clip.stl` | TPU 95A | The one C-clip for all 10 spots, 10 x 6.5 x 3.2 mm, already laid on its flat outer face: **no supports**. |
 | `v3/tpu_clip_x10.stl` | TPU 95A | 10 clips on one plate, same orientation. |
+| `switch_fit_test.stl` (in `prints/`) | PLA or PETG | Unchanged from v1: print it with the plate settings to check the 14.05 mm cutout first. |
 | `v3/dummy_pcb_left.stl`, `v3/dummy_pcb_right.stl` | PLA or PETG | v3 dummy PCBs (the shared PCB / plate edge), printed top face down. |
 | `v3/dummy_plate_left.stl`, `v3/dummy_plate_right.stl` | PLA or PETG | v3 dummy plates, flat, 1.5 mm, 14.05 mm switch cutouts. |
 
+- **Checked before printing (v3.4):** every file is watertight (no open edges; each volume matches the Fusion solid). A slicer may report a few non-manifold edges where faces meet at razor-thin points (the panel's band feet, under 0.03 mm) and repair them automatically; they change nothing. In Fusion: no interference between the case and the PCBs, plates, switches, keycaps, sockets, headers and their plug space, daughterboard and gaskets; every gasket fits its recess; walls at least 5 mm.
+- **Hardware:** 3 x M3 x 3 heat-set inserts (holes Ø4.0 x 3.6) and 3 x M3 x 6 countersunk screws (ISO 10642) for the panel (4.0 panel, 2.0 into the insert); 2 x M2 x 3 heat-set inserts (Ø3.2 x 3.6) and 2 x M2 x 5 screws for the daughterboard (1.6 board + 1.0 standoff, 2.4 into the insert); 4 x 3M SJ5302 bumpons; 10 printed TPU clips.
+- **Fit gaps:** the panel sits 0.2 mm off the body all round (`panel_gap_print`), so turn on elephant-foot compensation (0.1 to 0.2 mm) for the body and the panel, or the first layers can bind.
+- **Suggested order:** one `tpu_clip` and the switch fit strip first (check the grip and the cutout), then the dummy plates and PCBs, then the case body and the flat panel.
 - **One clip everywhere.** The v3 pocket walls are square to the PCB, so the PCB edge is 0.9 mm from the wall at every spot and one clip fits all 10 (v2 needed FRONT and BACK variants).
 - **Printing the clip:** it is a plain square block on its flat outer face: square corners on the bed, 0.5 mm rounds on the end edges (vertical as printed), 45 deg lead-ins on the slot, and the three lattice cells as vertical holes. No supports. Use 2 perimeters at 0.4 mm (the struts are 0.8 wide, the end walls 0.6, the skins 0.7) and 0.2 mm layers, slow (20 to 40 mm/s) as usual for TPU.
 - **Lattice:** one row of three 2.3 x 2.6 mm cells with rounded corners in the 4 mm ledge under the PCB. The struts between cells lean and the 0.7 mm skins span the cell tops, so they bend under a keypress (soft) and stiffen as the cells close (progressive). Untested: print one clip in 95A first and check the grip on the 1.6 mm PCB edge, the fit in a recess and the give. If it is too stiff, try 85A or ask for thinner struts.
