@@ -81,6 +81,10 @@ P = {  # §4, decided. Edit here and re-run both scripts. M5 sleeker (user): bez
     # The side-entry SM04B faced the web wall, and mated (6.25 long) its plug ended ~0.1 mm from the square wall with no room
     # for the wires to turn. jst_plug_h: the plug space under the PCB (mated 6.3 + the wires' bend); Fusion checks it clear
     "jst": [6.0, 2.9, 4.25], "jst_pocket": [8.0, 6.0], "jst_plug_h": 10.0,
+    # v3.2 (user: the cable hole as small as it can be, for the sound): jst_pocket only places the header (clear of the
+    # sockets); the plug and its wires take jst_plug [long, short] centred on the header (SHR-04V-S-B 7.0 x 2.8, ~0.5 round
+    # it), jst_plug_h deep, and the hole through the floor is that grown jst_hole[0] with R jst_hole[1] corners (Ø3 tool)
+    "jst_plug": [8.0, 4.0], "jst_hole": [0.5, 1.5],
     # v3 (user): the left (main) PCB has a second header, for the link to the right half (the daughterboard has one output),
     # the same part beside the first, in its own 8 x 6 pocket; the breakthrough is grown round both
     "snap_gap": 0.9,                # PCB edge to pocket wall at mid-PCB (the clip spine fills it)
@@ -273,6 +277,12 @@ def place_jst(pcb, keep, sgn):
         raise SystemExit("no room for the JST header near the inner back corner")
     c = best[1]
     return box(c[0] - hd / 2, c[1] - hl / 2, c[0] + hd / 2, c[1] + hl / 2), best[2]
+
+
+def plug_env(header):
+    """v3.2: the plug-and-wires space of a vertical header: jst_plug [long, short], centred on it, long side along v."""
+    c, (pl, pw) = header.centroid, P["jst_plug"]
+    return box(c.x - pw / 2, c.y - pl / 2, c.x + pw / 2, c.y + pl / 2)
 
 
 def place_jst2(pcb, keep, pocket1):
@@ -948,7 +958,7 @@ def _build(lay):
                      # the full §6.1 envelopes)
                      "keycaps": [key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
                                  for k in keys],
-                     "jst": jst, "jst_pocket": pocket,
+                     "jst": jst, "jst_pocket": pocket, "jst_plug": plug_env(jst),
                      "clips": clips,
                      "plate_bbox_world": [round(f(q[i] for q in corners3), 4) for f in (min, max) for i in range(3)],
                      # v2: what each flat placeholder's bodies must add up to in Fusion (mm3; fusion_build.check_volumes):
@@ -957,14 +967,14 @@ def _build(lay):
                          "Plate": round((plate.area - unary_union([key_rect(k, -c, -c, c, c) for k in keys] + list(stabs)).area) * pt, 2),
                          "Pcb": round(pcb.area * P["pcb_t"], 2),
                          "SocketKeepout": round(unary_union(sockets).area * P["socket_h"], 2),
-                         "JST": round(jst.area * P["jst"][2], 2), "JSTPlugPocket": round(pocket.area * P["jst_plug_h"], 2),
+                         "JST": round(jst.area * P["jst"][2], 2), "JSTPlugPocket": round(plug_env(jst).area * P["jst_plug_h"], 2),
                          "SwitchBottom": round(unary_union([key_rect(k, -c, -c, c, c) for k in keys]).area * -layers["switch_bottom"][0], 2),
                          "SwitchTop": round(unary_union([key_rect(k, -hw, -hw, hw, hw) for k in keys]).area * P["switch_top_h"], 2),
                          "KeyEnvelope": round(unary_union([key_rect(k, -k["w"] * U / 2 + .05, -U / 2 + .05, k["w"] * U / 2 - .05, U / 2 - .05)
                                                            for k in keys]).area * P["keycap_h"], 2)}}
         if jst2:
-            halves[h].update({"jst2": jst2, "jst_pocket2": pocket2})
-            halves[h]["expect_vol"].update({"JstLink": round(jst2.area * P["jst"][2], 2), "JstLinkPocket": round(pocket2.area * P["jst_plug_h"], 2)})
+            halves[h].update({"jst2": jst2, "jst_pocket2": pocket2, "jst_plug2": plug_env(jst2)})
+            halves[h]["expect_vol"].update({"JstLink": round(jst2.area * P["jst"][2], 2), "JstLinkPocket": round(plug_env(jst2).area * P["jst_plug_h"], 2)})
 
     # M5/M6 solid body. The pocket floor (op 2, from the top) is one plane per half parallel to its PCB with shallow
     # relief grooves between the rows (below) and a recess under each PCB clip. Islands stand up from it: a boss over
@@ -1119,8 +1129,16 @@ def _build(lay):
     for h, d in halves.items():
         M = Ms[h]
         A = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * wb + M[0, 3], M[1, 2] * wb + M[1, 3]]
-        jp = affinity.affine_transform(unary_union([d["jst_pocket"]] + ([d["jst_pocket2"]] if "jst_pocket2" in d else [])), A)
-        stubs.append(opn3(jp.buffer(r3).intersection(opens_core[h])))  # (v3: a vertical prism, so inside the leaning walls at every height)
+        plugs_ = [d["jst_plug"]] + ([d["jst_plug2"]] if "jst_plug2" in d else [])
+        jp = affinity.affine_transform(unary_union(plugs_), A)
+        # v3.2: the hole through the floor: the plug space as it leans down the PCB normal (its plan at the PCB underside and
+        # jst_plug_h below, hulled), grown jst_hole[0], R jst_hole[1] corners (was the 8 x 6 pocket grown 3)
+        Ab = [M[0, 0], M[0, 1], M[1, 0], M[1, 1], M[0, 2] * (wb - P["jst_plug_h"]) + M[0, 3], M[1, 2] * (wb - P["jst_plug_h"]) + M[1, 3]]
+        sweep_ = unary_union([MultiPoint(list(affinity.affine_transform(q_, A).exterior.coords) + list(affinity.affine_transform(q_, Ab).exterior.coords)).convex_hull
+                              for q_ in plugs_])
+        hm_, hr_ = P["jst_hole"]
+        hole_ = sweep_.buffer(hm_, join_style="mitre").buffer(-hr_, quad_segs=16).buffer(hr_, quad_segs=16)
+        stubs.append(hole_.intersection(opens_core[h]))  # (v3: a vertical prism, so inside the leaning walls at every height)
         lines.append(LineString([(jp.centroid.x, jp.centroid.y), (bay_c.x, bay_c.y)]))
     for q in islands:  # what Fusion takes out of the void: the island, run 0.5 into the wall (M6: no longer grown 0.05 in the
         # pocket: it left micro-jogs at the wall)
